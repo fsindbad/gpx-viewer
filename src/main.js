@@ -1,21 +1,19 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import 'leaflet-gpx'; // GPX plugin
+import 'leaflet-gpx';
 
 document.querySelector('#app').innerHTML = `
   <h1>GPX Viewer</h1>
   <input type="file" id="gpxInput" accept=".gpx" />
-  <div id="map" style="height: 500px;"></div>
+  <div id="map" style="height: 500px; margin-top: 10px;"></div>
 `;
 
 const map = L.map('map').setView([0, 0], 2);
-
-// Add OpenStreetMap tile layer
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18,
 }).addTo(map);
 
-// GPX file input logic
+// === GPX from local upload ===
 document.getElementById('gpxInput').addEventListener('change', function (e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -23,19 +21,38 @@ document.getElementById('gpxInput').addEventListener('change', function (e) {
   const reader = new FileReader();
   reader.onload = function (event) {
     const gpxData = event.target.result;
-
-    // Parse and display GPX
-    const gpx = new L.GPX(gpxData, {
-      async: true,
-      marker_options: {
-        startIconUrl: null,
-        endIconUrl: null,
-        shadowUrl: null,
-      },
-    }).on('loaded', function (e) {
-      map.fitBounds(e.target.getBounds());
-    }).addTo(map);
+    loadGpxFromString(gpxData);
   };
-
   reader.readAsText(file);
 });
+
+// === GPX from URL ===
+function loadGpxFromUrl(url) {
+  new L.GPX(url, {
+    async: true,
+    marker_options: {
+      startIconUrl: null,
+      endIconUrl: null,
+      shadowUrl: null,
+    },
+  }).on('loaded', function (e) {
+    map.fitBounds(e.target.getBounds());
+  }).addTo(map);
+}
+
+// === GPX from String (for FileReader) ===
+function loadGpxFromString(xmlText) {
+  new L.GPX(xmlText, {
+    async: true,
+    marker_options: {
+      startIconUrl: null,
+      endIconUrl: null,
+      shadowUrl: null,
+    },
+  }).on('loaded', function (e) {
+    map.fitBounds(e.target.getBounds());
+  }).addTo(map);
+}
+
+// Auto-load example GPX
+loadGpxFromUrl('https://raw.githubusercontent.com/gps-touring/sample-gpx/master/rheinfall-to-schaffhausen.gpx');
