@@ -46,7 +46,7 @@ function GpxViewer() {
       <ul>
         {tracks.map((t, i) => (
           <li key={i} className="mb-2">
-            📍 {t.name} — {t.track.points.length} points
+            {t.name} — {t.track.points.length} points
           </li>
         ))}
       </ul>

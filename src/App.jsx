@@ -123,7 +123,7 @@ export default function App() {
             Upload or preload a .gpx file to view sailing tracks.
           </p>
         )}
-
+ 
         {tracks.length > 0 && (
           <div className="mt-4 bg-gray-100 rounded-xl p-4">
             <h2 className="text-xl font-semibold mb-2 text-blue-600">
@@ -134,6 +134,12 @@ export default function App() {
                 <li key={idx} className="bg-white p-2 rounded shadow">
                   <strong>{track.name}</strong>: {track.stats.distance} km, {" "}
                   {track.stats.points} points
+                  {tracks.map((track, index) => (
+  <div key={index} className="mt-4 text-sm text-gray-700">
+    <h3 className="font-semibold">{track.name}</h3>
+    <p>Total points: {track.points.length}</p>
+  </div>
+))}
                 </li>
               ))}
             </ul>
