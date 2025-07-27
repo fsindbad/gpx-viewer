@@ -5,28 +5,26 @@ function GpxViewer() {
   const [tracks, setTracks] = useState([]);
   const [stats, setStats] = useState(null);
 
-  const handleFileUpload = (event) => {
-    const files = Array.from(event.target.files);
+  const handleFileUpload = (e) => {
+  const files = Array.from(e.target.files);
+  const newTracks = [];
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const gpx = new GPX();
-        gpx.parse(e.target.result);
+  files.forEach((file) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const gpx = new GPXParser();
+      gpx.parse(event.target.result);
+      const points = gpx.tracks[0].points.map((pt) => [pt.lat, pt.lon]);
+      newTracks.push({ name: file.name, points });
 
-        const track = gpx.tracks[0]; // first track per file
-        const distance = gpx.calculateDistance();
-        const elevation = gpx.calculateElevationGain();
+      if (newTracks.length === files.length) {
+        setTracks(newTracks);
+      }
+    };
+    reader.readAsText(file);
+  });
+};
 
-        setTracks((prev) => [...prev, { name: file.name, track }]);
-        setStats((prev) => ({
-          totalDistance: (prev?.totalDistance || 0) + distance,
-          totalElevation: (prev?.totalElevation || 0) + elevation,
-        }));
-      };
-      reader.readAsText(file);
-    });
-  };
 
   return (
     <div className="p-4">

@@ -1,61 +1,95 @@
-import React, { useState } from "react";
-import { MapContainer, TileLayer, Polyline, Marker, Popup } from "react-leaflet";
+import React, { useState, useEffect } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  Polyline,
+  Marker,
+  Popup,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import GPXParser from "gpxparser";
 
+const preloadFiles = [
+  "/tracks/sample1.gpx",
+  "/tracks/sample2.gpx",
+];
+
 export default function App() {
   const [tracks, setTracks] = useState([]);
-  const [fileNames, setFileNames] = useState([]);
+  const [loadedFiles, setLoadedFiles] = useState([]);
+
+  const parseGPX = async (text, name) => {
+    const gpx = new GPXParser();
+    gpx.parse(text);
+    const points = gpx.tracks[0]?.points || [];
+    const latlng = points.map((pt) => [pt.lat, pt.lon]);
+
+    let totalDistance = 0;
+    for (let i = 1; i < points.length; i++) {
+      const dx = points[i].lon - points[i - 1].lon;
+      const dy = points[i].lat - points[i - 1].lat;
+      totalDistance += Math.sqrt(dx * dx + dy * dy) * 111.32; // rough km
+    }
+
+    return {
+      name,
+      latlng,
+      stats: {
+        distance: totalDistance.toFixed(2),
+        points: points.length,
+      },
+    };
+  };
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
-    setFileNames(files.map((file) => file.name));
-
-    const readFiles = files.map((file) => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const gpx = new GPXParser();
-            gpx.parse(event.target.result);
-            const points = gpx.tracks[0]?.points.map((pt) => [pt.lat, pt.lon]) || [];
-            resolve({ name: file.name, points });
-          } catch (err) {
-            reject(err);
-          }
-        };
-        reader.onerror = reject;
-        reader.readAsText(file);
-      });
-    });
-
-    try {
-      const allTracks = await Promise.all(readFiles);
-      setTracks(allTracks.filter(t => t.points.length > 0));
-    } catch (err) {
-      console.error("Error parsing GPX files:", err);
-    }
+    const parsed = await Promise.all(
+      files.map((file) => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            const track = await parseGPX(event.target.result, file.name);
+            resolve(track);
+          };
+          reader.readAsText(file);
+        });
+      })
+    );
+    setTracks(parsed);
+    setLoadedFiles(files.map((f) => f.name));
   };
 
-  const mapCenter =
-    tracks.length > 0 && tracks[0].points.length > 0 ? tracks[0].points[0] : [0, 0];
+  useEffect(() => {
+    Promise.all(
+      preloadFiles.map(async (url) => {
+        const res = await fetch(url);
+        const text = await res.text();
+        return parseGPX(text, url.split("/").pop());
+      })
+    ).then((results) => {
+      setTracks(results);
+      setLoadedFiles(results.map((r) => r.name));
+    });
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-2xl p-6">
-        <h1 className="text-2xl font-bold mb-4">GPX Multi-Track Viewer</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 p-4">
+      <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-6">
+        <h1 className="text-3xl font-bold mb-4 text-blue-700">
+          GPX Sailing Track Viewer
+        </h1>
 
         <input
           type="file"
           accept=".gpx"
           multiple
           onChange={handleFileUpload}
-          className="mb-4"
+          className="mb-4 border p-2 rounded"
         />
 
-        {fileNames.length > 0 && (
-          <ul className="mb-4 text-gray-600 list-disc list-inside">
-            {fileNames.map((name, idx) => (
+        {loadedFiles.length > 0 && (
+          <ul className="mb-4 text-sm text-gray-700">
+            {loadedFiles.map((name, idx) => (
               <li key={idx}>{name}</li>
             ))}
           </ul>
@@ -63,29 +97,47 @@ export default function App() {
 
         {tracks.length > 0 ? (
           <MapContainer
-            center={mapCenter}
-            zoom={13}
+            center={tracks[0].latlng[0]}
+            zoom={12}
             style={{ height: "500px", width: "100%" }}
-            className="rounded-xl overflow-hidden"
+            className="rounded-xl overflow-hidden mb-4"
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution="&copy; OpenStreetMap contributors"
             />
-            {tracks.map((track, index) => (
-              <React.Fragment key={index}>
-                <Polyline positions={track.points} color="blue" />
-                <Marker position={track.points[0]}>
-                  <Popup>{track.name} Start</Popup>
+            {tracks.map((track, i) => (
+              <>
+                <Polyline key={i} positions={track.latlng} color="blue" />
+                <Marker position={track.latlng[0]}>
+                  <Popup>Start: {track.name}</Popup>
                 </Marker>
-                <Marker position={track.points[track.points.length - 1]}>
-                  <Popup>{track.name} End</Popup>
+                <Marker position={track.latlng[track.latlng.length - 1]}>
+                  <Popup>End: {track.name}</Popup>
                 </Marker>
-              </React.Fragment>
+              </>
             ))}
           </MapContainer>
         ) : (
-          <p className="text-gray-500">Upload one or more .gpx files to view tracks.</p>
+          <p className="text-gray-500">
+            Upload or preload a .gpx file to view sailing tracks.
+          </p>
+        )}
+
+        {tracks.length > 0 && (
+          <div className="mt-4 bg-gray-100 rounded-xl p-4">
+            <h2 className="text-xl font-semibold mb-2 text-blue-600">
+              Track Statistics
+            </h2>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+              {tracks.map((track, idx) => (
+                <li key={idx} className="bg-white p-2 rounded shadow">
+                  <strong>{track.name}</strong>: {track.stats.distance} km, {" "}
+                  {track.stats.points} points
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </div>
