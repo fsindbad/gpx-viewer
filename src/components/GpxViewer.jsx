@@ -37,6 +37,7 @@ function GpxViewer() {
         accept=".gpx"
         onChange={handleFileUpload}
         className="mb-4"
+        
       />
       {stats && (
         <div className="mb-4">
