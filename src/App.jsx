@@ -106,22 +106,23 @@ export default function App() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution="&copy; OpenStreetMap contributors"
             />
-            {tracks.map((track, i) => {
-              const colors = ["blue", "red", "green", "orange", "purple", "teal", "pink"];
-              const color = colors[i % colors.length];
-            
-              return (
-                <React.Fragment key={i}>
-                  <Polyline positions={track.latlng} color={color} />
-                  <Marker position={track.latlng[0]}>
-                    <Popup>Start: {track.name}</Popup>
-                  </Marker>
-                  <Marker position={track.latlng[track.latlng.length - 1]}>
-                    <Popup>End: {track.name}</Popup>
-                  </Marker>
-                </React.Fragment>
-              );
-            })}
+          {tracks.map((track, i) => {
+            const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
+            const color = colors[i % colors.length];
+          
+            return (
+              <React.Fragment key={i}>
+                <Polyline positions={track.latlng} color={color} />
+                <Marker position={track.latlng[0]}>
+                  <Popup>Start: {track.name}</Popup>
+                </Marker>
+                <Marker position={track.latlng[track.latlng.length - 1]}>
+                  <Popup>End: {track.name}</Popup>
+                </Marker>
+              </React.Fragment>
+            );
+          })}
+
           </MapContainer>
         ) : (
           <p className="text-gray-500">
