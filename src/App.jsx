@@ -112,7 +112,7 @@ export default function App() {
           
             return (
               <React.Fragment key={i}>
-                <Polyline positions={track.latlng} color={color} />
+                <Polyline positions={track.latlng} pathOptions={{ color }} />
                 <Marker position={track.latlng[0]}>
                   <Popup>Start: {track.name}</Popup>
                 </Marker>
@@ -122,6 +122,7 @@ export default function App() {
               </React.Fragment>
             );
           })}
+
 
           </MapContainer>
         ) : (
