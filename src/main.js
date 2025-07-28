@@ -55,4 +55,4 @@ function loadGpxFromString(xmlText) {
 }
 
 // Auto-load example GPX
-loadGpxFromUrl('tracks/monalisa_rappi_yacht_club.gpx');
+loadGpxFromUrl('/tracks/sample1.gpx');

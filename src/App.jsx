@@ -21,6 +21,10 @@ export default function App() {
   const parseGPX = async (text, name) => {
     const gpx = new GPXParser();
     gpx.parse(text);
+    if (!gpx.tracks.length) {
+  console.error(`No tracks found in file: ${name}`);
+}
+
     const points = gpx.tracks[0]?.points || [];
     const latlng = points.map((pt) => [pt.lat, pt.lon]);
 
@@ -59,19 +63,24 @@ export default function App() {
     setLoadedFiles(files.map((f) => f.name));
   };
 
-  useEffect(() => {
-    Promise.all(
-      preloadFiles.map(async (url) => {
-        const res = await fetch(url);
-        const text = await res.text();
-        return parseGPX(text, url.split("/").pop());
-      })
-    ).then((results) => {
-      setTracks(results);
-      console.log("Preloaded tracks:", results.map((r, i) => ({ name: r.name, color: colors[i % colors.length] })));
-      setLoadedFiles(results.map((r) => r.name));
-    });
+ useEffect(() => {
+    (async () => {
+      try {
+        const results = await Promise.all(
+          preloadFiles.map(async (url) => {
+            const res = await fetch(url);
+            const text = await res.text();
+            return parseGPX(text, url.split("/").pop());
+          })
+        );
+        setTracks(results);
+        setLoadedFiles(results.map((r) => r.name));
+      } catch (err) {
+        console.error("Error preloading files:", err);
+      }
+    })();
   }, []);
+
 
   const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
 
@@ -111,7 +120,7 @@ export default function App() {
             />
             {tracks.map((track, i) => (
               <React.Fragment key={i}>
-                <Polyline positions={track.latlng} pathOptions={{ color: colors[i % colors.length] }} />
+                <Polyline positions={track.latlng} color={colors[i % colors.length]} />
                 <Marker position={track.latlng[0]}>
                   <Popup>Start: {track.name}</Popup>
                 </Marker>
