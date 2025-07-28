@@ -55,4 +55,4 @@ function loadGpxFromString(xmlText) {
 }
 
 // Auto-load example GPX
-loadGpxFromUrl('https://firebasestorage.googleapis.com/v0/b/blazing-torch-5326.appspot.com/o/files%2Ftsay0AKAn9YaJs7CD4AyeniXcBh2%2FNavionics_archive_export%202_1694015059020.gpx');
+loadGpxFromUrl('https://drive.google.com/file/d/1Clij1kklN1oFP1BDXqpFviCq8Z2O-vyK/view?usp=sharing');
