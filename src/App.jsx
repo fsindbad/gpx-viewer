@@ -106,7 +106,7 @@ export default function App() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution="&copy; OpenStreetMap contributors"
             />
-          {tracks.map((track, i) => {
+        {tracks.map((track, i) => {
             const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
             const color = colors[i % colors.length];
           
@@ -122,7 +122,6 @@ export default function App() {
               </React.Fragment>
             );
           })}
-
 
           </MapContainer>
         ) : (
