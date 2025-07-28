@@ -55,4 +55,4 @@ function loadGpxFromString(xmlText) {
 }
 
 // Auto-load example GPX
-loadGpxFromUrl('https://raw.githubusercontent.com/gps-touring/sample-gpx/master/rheinfall-to-schaffhausen.gpx');
+loadGpxFromUrl('https://firebasestorage.googleapis.com/v0/b/blazing-torch-5326.appspot.com/o/files%2Ftsay0AKAn9YaJs7CD4AyeniXcBh2%2FNavionics_archive_export%202_1694015059020.gpx');
