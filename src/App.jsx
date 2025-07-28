@@ -106,17 +106,22 @@ export default function App() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution="&copy; OpenStreetMap contributors"
             />
-            {tracks.map((track, i) => (
-              <>
-                <Polyline key={i} positions={track.latlng} color="blue" />
-                <Marker position={track.latlng[0]}>
-                  <Popup>Start: {track.name}</Popup>
-                </Marker>
-                <Marker position={track.latlng[track.latlng.length - 1]}>
-                  <Popup>End: {track.name}</Popup>
-                </Marker>
-              </>
-            ))}
+            {tracks.map((track, i) => {
+  const colors = ["blue", "red", "green", "orange", "purple", "teal", "pink"];
+  const color = colors[i % colors.length];
+
+  return (
+    <React.Fragment key={i}>
+      <Polyline positions={track.latlng} color={color} />
+      <Marker position={track.latlng[0]}>
+        <Popup>Start: {track.name}</Popup>
+      </Marker>
+      <Marker position={track.latlng[track.latlng.length - 1]}>
+        <Popup>End: {track.name}</Popup>
+      </Marker>
+    </React.Fragment>
+  );
+})}
           </MapContainer>
         ) : (
           <p className="text-gray-500">
@@ -134,12 +139,7 @@ export default function App() {
                 <li key={idx} className="bg-white p-2 rounded shadow">
                   <strong>{track.name}</strong>: {track.stats.distance} km, {" "}
                   {track.stats.points} points
-                  {tracks.map((track, index) => (
-  <div key={index} className="mt-4 text-sm text-gray-700">
-    <h3 className="font-semibold">{track.name}</h3>
-    <p>Total points: {track.points.length}</p>
-  </div>
-))}
+                  
                 </li>
               ))}
             </ul>
