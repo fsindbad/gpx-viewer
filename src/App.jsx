@@ -72,6 +72,8 @@ export default function App() {
     });
   }, []);
 
+  const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 p-4">
       <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-6">
@@ -90,7 +92,7 @@ export default function App() {
         {loadedFiles.length > 0 && (
           <ul className="mb-4 text-sm text-gray-700">
             {loadedFiles.map((name, idx) => (
-              <li key={idx}>{name}</li>
+              <li key={idx}>✅ {name}</li>
             ))}
           </ul>
         )}
@@ -106,13 +108,9 @@ export default function App() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution="&copy; OpenStreetMap contributors"
             />
-        {tracks.map((track, i) => {
-            const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
-            const color = colors[i % colors.length];
-          
-            return (
+            {tracks.map((track, i) => (
               <React.Fragment key={i}>
-                <Polyline positions={track.latlng} pathOptions={{ color }} />
+                <Polyline positions={track.latlng} pathOptions={{ color: colors[i % colors.length] }} />
                 <Marker position={track.latlng[0]}>
                   <Popup>Start: {track.name}</Popup>
                 </Marker>
@@ -120,16 +118,14 @@ export default function App() {
                   <Popup>End: {track.name}</Popup>
                 </Marker>
               </React.Fragment>
-            );
-          })}
-
+            ))}
           </MapContainer>
         ) : (
           <p className="text-gray-500">
             Upload or preload a .gpx file to view sailing tracks.
           </p>
         )}
- 
+
         {tracks.length > 0 && (
           <div className="mt-4 bg-gray-100 rounded-xl p-4">
             <h2 className="text-xl font-semibold mb-2 text-blue-600">
@@ -140,7 +136,6 @@ export default function App() {
                 <li key={idx} className="bg-white p-2 rounded shadow">
                   <strong>{track.name}</strong>: {track.stats.distance} km, {" "}
                   {track.stats.points} points
-                  
                 </li>
               ))}
             </ul>

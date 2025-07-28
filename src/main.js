@@ -55,4 +55,4 @@ function loadGpxFromString(xmlText) {
 }
 
 // Auto-load example GPX
-loadGpxFromUrl('https://drive.google.com/file/d/1Clij1kklN1oFP1BDXqpFviCq8Z2O-vyK/view?usp=sharing');
+loadGpxFromUrl('tracks/monalisa_rappi_yacht_club.gpx');
