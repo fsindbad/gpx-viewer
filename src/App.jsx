@@ -68,6 +68,7 @@ export default function App() {
       })
     ).then((results) => {
       setTracks(results);
+      console.log("Preloaded tracks:", results.map((r, i) => ({ name: r.name, color: colors[i % colors.length] })));
       setLoadedFiles(results.map((r) => r.name));
     });
   }, []);
@@ -133,9 +134,9 @@ export default function App() {
             </h2>
             <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
               {tracks.map((track, idx) => (
-                <li key={idx} className="bg-white p-2 rounded shadow">
-                  <strong>{track.name}</strong>: {track.stats.distance} km, {" "}
-                  {track.stats.points} points
+                <li key={idx} className="bg-white p-2 rounded shadow flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: colors[idx % colors.length] }}></div>
+                  <strong>{track.name}</strong>: {track.stats.distance} km, {track.stats.points} points
                 </li>
               ))}
             </ul>
