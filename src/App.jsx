@@ -9,6 +9,20 @@ import {
 import "leaflet/dist/leaflet.css";
 import GPXParser from "gpxparser";
 
+import L from "leaflet";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+delete L.Icon.Default.prototype._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
+
+
 const preloadFiles = [
   "/tracks/sample1.gpx",
   "/tracks/sample2.gpx",
@@ -120,7 +134,10 @@ export default function App() {
             />
             {tracks.map((track, i) => (
               <React.Fragment key={i}>
-                <Polyline positions={track.latlng} color={colors[i % colors.length]} />
+               <Polyline
+                  positions={track.latlng}
+                  pathOptions={{ color: colors[i % colors.length], weight: 4 }}
+                />
                 <Marker position={track.latlng[0]}>
                   <Popup>Start: {track.name}</Popup>
                 </Marker>
