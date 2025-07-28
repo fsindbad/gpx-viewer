@@ -3,7 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-gpx';
 
 document.querySelector('#app').innerHTML = `
-  <h1>GPX Viewer</h1>
+  <h1>Franks colorful GPX Viewer</h1>
   <input type="file" id="gpxInput" accept=".gpx" />
   <div id="map" style="height: 500px; margin-top: 10px;"></div>
 `;
