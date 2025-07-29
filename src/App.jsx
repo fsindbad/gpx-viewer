@@ -7,21 +7,17 @@ import {
   Popup,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import GPXParser from "gpxparser";
+import L from "leaflet"; // ADD THIS
 
-// ✅ Leaflet icon fix:
-import L from "leaflet";
-import markerIcon2x from "/public/icons/marker-icon-2x.png";
-import markerIcon from "/public/icons/marker-icon.png";
-import markerShadow from "/public/icons/marker-shadow.png";
-
+// ADD THIS BLOCK
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
+  iconRetinaUrl: "/icons/marker-icon-2x.png",
+  iconUrl: "/icons/marker-icon.png",
+  shadowUrl: "/icons/marker-shadow.png",
 });
 
+import GPXParser from "gpxparser";
 
 const preloadFiles = [
   "/tracks/sample1.gpx",
