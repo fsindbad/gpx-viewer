@@ -33,10 +33,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl,
 });
 
-<Marker position={someLatLng} icon={customIcon}>
-  <Popup>Hello there!</Popup>
-</Marker>
-
 
 const preloadFiles = [
   "/tracks/sample1.gpx",
@@ -139,15 +135,25 @@ export default function App() {
             />
             {tracks.map((track, i) => (
               <React.Fragment key={i}>
-                <Polyline positions={track.latlng} pathOptions={{ color: colors[i % colors.length] }} />
-                <Marker position={track.latlng[0]}>
+                <Polyline
+                  positions={track.latlng}
+                  pathOptions={{ color: colors[i % colors.length] }}
+                />
+                <Marker
+                  position={track.latlng[0]}
+                  icon={customIcon} // ✅ assign custom icon
+                >
                   <Popup>Start: {track.name}</Popup>
                 </Marker>
-                <Marker position={track.latlng[track.latlng.length - 1]}>
+                <Marker
+                  position={track.latlng[track.latlng.length - 1]}
+                  icon={customIcon} // ✅ assign custom icon
+                >
                   <Popup>End: {track.name}</Popup>
                 </Marker>
               </React.Fragment>
             ))}
+
           </MapContainer>
         ) : (
           <p className="text-gray-500">
