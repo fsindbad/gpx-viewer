@@ -43,6 +43,9 @@ const preloadFiles = [
   "/tracks/sample2.gpx",
 ];
 
+const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
+
+
 export default function App() {
   const [tracks, setTracks] = useState([]);
   const [loadedFiles, setLoadedFiles] = useState([]);
@@ -100,8 +103,7 @@ export default function App() {
       setLoadedFiles(results.map((r) => r.name));
     });
   }, []);
-
-  const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 p-4">
@@ -137,6 +139,7 @@ export default function App() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution="&copy; OpenStreetMap contributors"
             />
+            
             {tracks.map((track, i) => (
               <React.Fragment key={i}>
                 <Polyline
