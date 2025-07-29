@@ -16,12 +16,13 @@ import shadowUrl from "./assets/icons/marker-shadow.png?url";
 
 // ✅ Then use them
 const customIcon = new L.Icon({
-  iconUrl,
-  iconRetinaUrl,
-  shadowUrl,
+  iconUrl: "/icons/marker-icon.png",
+  iconRetinaUrl: "/icons/marker-icon-2x.png",
+  shadowUrl: "/icons/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
 });
+
 
 // ✅ Optionally override Leaflet’s fallback logic
 delete L.Icon.Default.prototype._getIconUrl;
@@ -30,6 +31,8 @@ L.Icon.Default.mergeOptions({
   iconUrl,
   shadowUrl,
 });
+
+console.log({ iconUrl, iconRetinaUrl, shadowUrl });
 
 const preloadFiles = [
   "/tracks/sample1.gpx",
