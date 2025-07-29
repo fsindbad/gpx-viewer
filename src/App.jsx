@@ -6,18 +6,21 @@ import {
   Marker,
   Popup,
 } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+// import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import GPXParser from "gpxparser";
 
 // ✅ Fix the default Leaflet icon paths
 import "leaflet/dist/leaflet.css";
+import "./leaflet-custom.css"; // <--- Add this line AFTER the default Leaflet CSS
+
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "/icons/marker-icon-2x.png",
   iconUrl: "/icons/marker-icon.png",
   shadowUrl: "/icons/marker-shadow.png",
 });
+
 
 const preloadFiles = [
   "/tracks/sample1.gpx",

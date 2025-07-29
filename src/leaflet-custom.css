@@ -1,0 +1,17 @@
+/* src/leaflet-custom.css */
+.leaflet-container .leaflet-marker-icon,
+.leaflet-container .leaflet-marker-shadow {
+  background-image: none !important;
+}
+
+.leaflet-container .leaflet-marker-icon {
+  background-image: url('/icons/marker-icon.png') !important;
+}
+
+.leaflet-container .leaflet-marker-shadow {
+  background-image: url('/icons/marker-shadow.png') !important;
+}
+
+.leaflet-container .leaflet-marker-icon-2x {
+  background-image: url('/icons/marker-icon-2x.png') !important;
+}
