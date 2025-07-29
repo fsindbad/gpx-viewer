@@ -43,10 +43,9 @@ const preloadFiles = [
   "/tracks/sample2.gpx",
 ];
 
-const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
-
 
 export default function App() {
+  const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
   const [tracks, setTracks] = useState([]);
   const [loadedFiles, setLoadedFiles] = useState([]);
 
