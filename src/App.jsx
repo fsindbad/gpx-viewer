@@ -7,17 +7,17 @@ import {
   Popup,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet"; // ✅ Needed to override default icons
+import L from "leaflet";
 import GPXParser from "gpxparser";
 
-// ✅ Fix Leaflet's default marker icon paths BEFORE any map is rendered
+// ✅ Fix the default Leaflet icon paths
+import "leaflet/dist/leaflet.css";
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "/icons/marker-icon-2x.png",
   iconUrl: "/icons/marker-icon.png",
   shadowUrl: "/icons/marker-shadow.png",
 });
-
 
 const preloadFiles = [
   "/tracks/sample1.gpx",
@@ -31,10 +31,6 @@ export default function App() {
   const parseGPX = async (text, name) => {
     const gpx = new GPXParser();
     gpx.parse(text);
-    if (!gpx.tracks.length) {
-  console.error(`No tracks found in file: ${name}`);
-}
-
     const points = gpx.tracks[0]?.points || [];
     const latlng = points.map((pt) => [pt.lat, pt.lon]);
 
@@ -73,24 +69,18 @@ export default function App() {
     setLoadedFiles(files.map((f) => f.name));
   };
 
- useEffect(() => {
-    (async () => {
-      try {
-        const results = await Promise.all(
-          preloadFiles.map(async (url) => {
-            const res = await fetch(url);
-            const text = await res.text();
-            return parseGPX(text, url.split("/").pop());
-          })
-        );
-        setTracks(results);
-        setLoadedFiles(results.map((r) => r.name));
-      } catch (err) {
-        console.error("Error preloading files:", err);
-      }
-    })();
+  useEffect(() => {
+    Promise.all(
+      preloadFiles.map(async (url) => {
+        const res = await fetch(url);
+        const text = await res.text();
+        return parseGPX(text, url.split("/").pop());
+      })
+    ).then((results) => {
+      setTracks(results);
+      setLoadedFiles(results.map((r) => r.name));
+    });
   }, []);
-
 
   const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
 
@@ -130,10 +120,7 @@ export default function App() {
             />
             {tracks.map((track, i) => (
               <React.Fragment key={i}>
-               <Polyline
-                  positions={track.latlng}
-                  pathOptions={{ color: colors[i % colors.length], weight: 4 }}
-                />
+                <Polyline positions={track.latlng} pathOptions={{ color: colors[i % colors.length] }} />
                 <Marker position={track.latlng[0]}>
                   <Popup>Start: {track.name}</Popup>
                 </Marker>
@@ -156,9 +143,9 @@ export default function App() {
             </h2>
             <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
               {tracks.map((track, idx) => (
-                <li key={idx} className="bg-white p-2 rounded shadow flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: colors[idx % colors.length] }}></div>
-                  <strong>{track.name}</strong>: {track.stats.distance} km, {track.stats.points} points
+                <li key={idx} className="bg-white p-2 rounded shadow">
+                  <strong>{track.name}</strong>: {track.stats.distance} km, {" "}
+                  {track.stats.points} points
                 </li>
               ))}
             </ul>
