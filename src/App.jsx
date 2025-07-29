@@ -7,9 +7,10 @@ import {
   Popup,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
+import L from "leaflet"; // ✅ Needed to override default icons
+import GPXParser from "gpxparser";
 
-// Fix Leaflet marker icon paths
+// ✅ Fix Leaflet's default marker icon paths BEFORE any map is rendered
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "/icons/marker-icon-2x.png",
@@ -17,7 +18,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "/icons/marker-shadow.png",
 });
 
-import GPXParser from "gpxparser";
 
 const preloadFiles = [
   "/tracks/sample1.gpx",
