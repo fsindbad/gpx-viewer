@@ -43,6 +43,12 @@ const preloadFiles = [
   "/tracks/sample2.gpx",
 ];
 
+const points = gpx.tracks[0]?.points || [];
+if (points.length === 0) {
+  console.warn("No points found in GPX track:", name);
+}
+const latlng = points.map(pt => [pt.lat, pt.lon]);
+
 
 export default function App() {
   const colors = ["blue", "red", "green", "orange", "purple", "teal", "magenta", "brown"];
