@@ -7,9 +7,9 @@ import {
   Popup,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet"; // ADD THIS
+import L from "leaflet";
 
-// ADD THIS BLOCK
+// Fix Leaflet marker icon paths
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "/icons/marker-icon-2x.png",
