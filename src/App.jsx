@@ -6,28 +6,22 @@ import {
   Marker,
   Popup,
 } from "react-leaflet";
-// import "leaflet/dist/leaflet.css";
+
 import L from "leaflet";
-import GPXParser from "gpxparser";
-
-// ✅ Fix the default Leaflet icon paths
 import "leaflet/dist/leaflet.css";
-import "./leaflet-custom.css"; // <--- Add this line AFTER the default Leaflet CSS
 
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-
+// ✅ Use relative paths with ?url to let Vite bundle the assets
 import iconUrl from "./icons/marker-icon.png?url";
 import iconRetinaUrl from "./icons/marker-icon-2x.png?url";
 import shadowUrl from "./icons/marker-shadow.png?url";
 
+// ✅ Correct way to override the default Leaflet marker paths
+delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl,
   iconUrl,
   shadowUrl,
 });
-
-
 
 const preloadFiles = [
   "/tracks/sample1.gpx",
