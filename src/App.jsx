@@ -11,17 +11,27 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 // ✅ Use relative paths with ?url to let Vite bundle the assets
-import iconUrl from "./icons/marker-icon.png?url";
-import iconRetinaUrl from "./icons/marker-icon-2x.png?url";
-import shadowUrl from "./icons/marker-shadow.png?url";
+// import iconUrl from "./icons/marker-icon.png?url";
+// import iconRetinaUrl from "./icons/marker-icon-2x.png?url";
+//import shadowUrl from "./icons/marker-shadow.png?url";
 
-// ✅ Correct way to override the default Leaflet marker paths
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl,
-  iconUrl,
-  shadowUrl,
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
+
+// ✅ Correct way to override the default Leaflet marker paths
+//delete L.Icon.Default.prototype._getIconUrl;
+//L.Icon.Default.mergeOptions({
+//  iconRetinaUrl,
+//  iconUrl,
+ // shadowUrl,
+//});
 
 const preloadFiles = [
   "/tracks/sample1.gpx",
