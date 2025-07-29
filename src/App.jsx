@@ -138,12 +138,15 @@ export default function App() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution="&copy; OpenStreetMap contributors"
             />
-            
+
             {tracks.map((track, i) => (
+             const color = colors[i % colors.length];
+              console.log(`Track ${i} polyline color:`, color);
+              return (
               <React.Fragment key={i}>
                 <Polyline
-                  positions={track.latlng}
-                  pathOptions={{ color: colors[i % colors.length] }}
+                  positions={track.latlng} 
+                  pathOptions={{ color, weight: 5, opacity: 0.8 }}
                 />
                 <Marker
                   position={track.latlng[0]}
@@ -159,6 +162,7 @@ export default function App() {
                 </Marker>
               </React.Fragment>
             ))}
+
 
           </MapContainer>
         ) : (
