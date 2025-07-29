@@ -16,9 +16,15 @@ import "./leaflet-custom.css"; // <--- Add this line AFTER the default Leaflet C
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "/icons/marker-icon-2x.png",
-  iconUrl: "/icons/marker-icon.png",
-  shadowUrl: "/icons/marker-shadow.png",
+
+import iconUrl from "/icons/marker-icon.png?url";
+import iconRetinaUrl from "/icons/marker-icon-2x.png?url";
+import shadowUrl from "/icons/marker-shadow.png?url";
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl,
+  iconUrl,
+  shadowUrl,
 });
 
 
