@@ -192,11 +192,14 @@ export default function App() {
             </ul>
           </div>
         )}
-        </div>
-              <!-- hitwebcounter Code START -->
-              <a href="https://www.hitwebcounter.com" target="_blank">
-              <img src="https://hitwebcounter.com/counter/counter.php?page=21274072&style=0001&nbdigits=5&type=page&initCount=0" title="Counter Widget" Alt="Visit counter For Websites"   border="0" /></a>                
-            </div>
+        <div
+         className="text-center mt-8 text-sm text-gray-400"
+         dangerouslySetInnerHTML={{
+               <!-- hitwebcounter Code START -->
+       <a href="https://www.hitwebcounter.com" target="_blank">
+       <img src="https://hitwebcounter.com/counter/counter.php?page=21274180&style=0024&nbdigits=5&type=ip&initCount=0" title="Counter Widget" Alt="Visit counter For Websites"   border="0" /></a>     
+            }}
+       ></div>
       </div>
     </div>
   );
