@@ -193,32 +193,11 @@ export default function App() {
           </div>
         )}
       </div>
-      {tracks.length > 0 && (
-        <div className="mt-4 bg-gray-100 rounded-xl p-4">
-          <h2 className="text-xl font-semibold mb-2 text-blue-600">
-            Track Statistics
-          </h2>
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-            {tracks.map((track, idx) => (
-              <li key={idx} className="bg-white p-2 rounded shadow">
-                <strong>{track.name}</strong>: {track.stats.distance} km,{" "}
-                {track.stats.points} points
-              </li>
-            ))}
-          </ul>
         </div>
-      )}
-      
-      {/* ✅ Add the visitor counter below everything */}
-      <div className="text-center mt-8 text-sm text-gray-400">
-        Visitors:
-        <img
-          src="https://hitwebcounter.com/counter/counter.php?page=123456&style=0006&nbdigits=5&type=page&initCount=0"
-          alt="Visitor Counter"
-          className="inline-block ml-2"
-        />
-      </div>
-
+      <!-- hitwebcounter Code START -->
+      <a href="https://www.hitwebcounter.com" target="_blank">
+      <img src="https://hitwebcounter.com/counter/counter.php?page=21274072&style=0001&nbdigits=5&type=page&initCount=0" title="Counter Widget" Alt="Visit counter For Websites"   border="0" /></a>                
+    </div>
     </div>
   );
 }
