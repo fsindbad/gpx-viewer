@@ -38,10 +38,12 @@ L.Icon.Default.mergeOptions({
 });
 
 
-const preloadFiles = [
-  "/tracks/sample1.gpx",
-  "/tracks/sample2.gpx",
-];
+// - preloading out comment
+// const preloadFiles = [
+//  "/tracks/sample1.gpx",
+// "/tracks/sample2.gpx",
+//];
+// - end pereloading
 
 const points = gpx.tracks[0]?.points || [];
 if (points.length === 0) {
