@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hazu – Produkt-Übersicht</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f4f5f7;
+    color: #1a1a2e;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+    color: white;
+    padding: 36px 48px 28px;
+  }
+  header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  header p { font-size: 14px; color: rgba(255,255,255,0.55); margin-top: 4px; }
+
+  /* SUMMARY CARDS */
+  .summary {
+    display: flex;
+    gap: 16px;
+    padding: 28px 48px 0;
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 18px 24px;
+    flex: 1;
+    min-width: 140px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    border: 1px solid #e8eaed;
+  }
+  .stat-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #888; font-weight: 600; }
+  .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; color: #1a1a2e; }
+  .stat-card .sub { font-size: 12px; color: #aaa; margin-top: 2px; }
+
+  /* CONTROLS */
+  .controls {
+    display: flex;
+    gap: 10px;
+    padding: 24px 48px 0;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-btn {
+    padding: 7px 16px;
+    border-radius: 20px;
+    border: 1.5px solid #dde1e7;
+    background: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #444;
+  }
+  .filter-btn:hover { border-color: #0f3460; color: #0f3460; }
+  .filter-btn.active {
+    background: #0f3460;
+    border-color: #0f3460;
+    color: white;
+  }
+  .search-box {
+    margin-left: auto;
+    padding: 7px 16px;
+    border-radius: 20px;
+    border: 1.5px solid #dde1e7;
+    font-size: 13px;
+    outline: none;
+    width: 220px;
+    background: white;
+    color: #333;
+  }
+  .search-box:focus { border-color: #0f3460; }
+
+  /* GRID */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    padding: 24px 48px 48px;
+  }
+
+  /* PRODUCT CARD */
+  .card {
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #e8eaed;
+    padding: 20px 22px 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    transition: box-shadow 0.18s, transform 0.18s;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+  }
+  .card:hover {
+    box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+    transform: translateY(-2px);
+  }
+  .card.hidden { display: none; }
+
+  .card-accent {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a1a2e;
+    line-height: 1.3;
+    flex: 1;
+    padding-right: 12px;
+  }
+  .card-price {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f3460;
+    white-space: nowrap;
+  }
+  .card-price .per {
+    font-size: 10px;
+    font-weight: 500;
+    color: #aaa;
+    display: block;
+    text-align: right;
+    margin-top: 1px;
+  }
+
+  .card-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    align-items: center;
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-recurring { background: #e8f5e9; color: #2e7d32; }
+  .badge-onetime { background: #fff8e1; color: #f57f17; }
+  .badge-inactive { background: #fce4ec; color: #c62828; }
+
+  .usage-bar-wrap {
+    margin-top: 12px;
+  }
+  .usage-label {
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .usage-label span { font-weight: 600; color: #555; }
+  .usage-bar-bg {
+    background: #f0f2f5;
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+  }
+  .usage-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+  }
+
+  .card-id {
+    position: absolute;
+    bottom: 14px;
+    right: 16px;
+    font-size: 10px;
+    color: #ccc;
+    font-weight: 500;
+  }
+
+  /* WARNING DOT */
+  .warn-dot {
+    width: 8px; height: 8px;
+    background: #ff9800;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  /* SECTION HEADERS */
+  .section-header {
+    padding: 12px 48px 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #aaa;
+    font-weight: 700;
+  }
+
+  /* TYPE COLORS */
+  :root {
+    --licence: #3b5bdb;
+    --addon: #7c3aed;
+    --project: #0891b2;
+    --training: #059669;
+    --modul: #d97706;
+    --content: #64748b;
+    --discount: #e11d48;
+  }
+
+  /* CHART SECTION */
+  .chart-section {
+    padding: 0 48px 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .chart-card {
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #e8eaed;
+    padding: 20px 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .chart-card h3 { font-size: 13px; font-weight: 700; color: #333; margin-bottom: 16px; }
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-label { font-size: 12px; color: #555; width: 120px; flex-shrink: 0; text-align: right; }
+  .bar-outer { flex: 1; background: #f0f2f5; border-radius: 4px; height: 22px; overflow: hidden; position: relative; }
+  .bar-inner { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; transition: width 0.5s ease; }
+  .bar-inner span { font-size: 11px; font-weight: 700; color: white; white-space: nowrap; }
+
+  @media (max-width: 900px) {
+    header { padding: 24px; }
+    .summary, .controls, .grid, .chart-section, .section-header { padding-left: 16px; padding-right: 16px; }
+    .chart-section { grid-template-columns: 1fr; }
+    .bar-label { width: 80px; font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hazu Produkt-Katalog</h1>
+  <p>47 Produkte · Stand März 2026</p>
+</header>
+
+<!-- SUMMARY STATS -->
+<div class="summary">
+  <div class="stat-card">
+    <div class="label">Produkte total</div>
+    <div class="value">47</div>
+    <div class="sub">in 7 Typen</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Nutzungen (gesamt)</div>
+    <div class="value">811</div>
+    <div class="sub">in Vertragspostionen</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Günstigstes Produkt</div>
+    <div class="value">CHF 5</div>
+    <div class="sub">Lizenz Lese-Zugriff</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Teuerstes Produkt</div>
+    <div class="value">CHF 36'000</div>
+    <div class="sub">Enterprise-Lizenz</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Top-Produkt</div>
+    <div class="value">141×</div>
+    <div class="sub">Projekt individuell</div>
+  </div>
+</div>
+
+<!-- CHARTS -->
+<div style="padding: 24px 48px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #aaa; font-weight: 700;">Übersicht nach Kategorie</div>
+<div class="chart-section" style="margin-top: 12px;">
+  <div class="chart-card">
+    <h3>Anzahl Produkte pro Typ</h3>
+    <div class="bar-chart" id="countChart"></div>
+  </div>
+  <div class="chart-card">
+    <h3>Verwendungen pro Typ (in Verträgen)</h3>
+    <div class="bar-chart" id="usageChart"></div>
+  </div>
+</div>
+
+<!-- FILTER CONTROLS -->
+<div class="controls">
+  <button class="filter-btn active" onclick="filter('all', this)">Alle (47)</button>
+  <button class="filter-btn" onclick="filter('licence', this)">Lizenz (20)</button>
+  <button class="filter-btn" onclick="filter('addon', this)">Add-on (8)</button>
+  <button class="filter-btn" onclick="filter('project', this)">Projekt (6)</button>
+  <button class="filter-btn" onclick="filter('training', this)">Training (7)</button>
+  <button class="filter-btn" onclick="filter('modul', this)">Modul (3)</button>
+  <button class="filter-btn" onclick="filter('content', this)">Content (1)</button>
+  <button class="filter-btn" onclick="filter('discount', this)">Rabatt (1)</button>
+  <input class="search-box" type="text" placeholder="🔍  Produkt suchen..." oninput="search(this.value)">
+</div>
+
+<!-- GRID -->
+<div class="grid" id="grid"></div>
+
+<script>
+const TYPE_COLORS = {
+  licence:  '#3b5bdb',
+  addon:    '#7c3aed',
+  project:  '#0891b2',
+  training: '#059669',
+  modul:    '#d97706',
+  content:  '#64748b',
+  discount: '#e11d48',
+};
+const TYPE_LABELS = {
+  licence: 'Lizenz', addon: 'Add-on', project: 'Projekt',
+  training: 'Training', modul: 'Modul', content: 'Content', discount: 'Rabatt'
+};
+
+const PRODUCTS = [
+  // LICENCES
+  { id:1,  title:'Premium',                                      cost:300,   type:'licence', recurring:true,  quota:1,   quota_unit:'Admin',   usage:56,  warn:false },
+  { id:2,  title:'Professional',                                 cost:3000,  type:'licence', recurring:true,  quota:10,  quota_unit:'Owner',   usage:59,  warn:false },
+  { id:3,  title:'Enterprise',                                   cost:36000, type:'licence', recurring:true,  quota:250, quota_unit:'Owner',   usage:6,   warn:true, warnText:'Beschreibung falsch (copy von Premium)' },
+  { id:4,  title:'Professional für Schulen',                     cost:3000,  type:'licence', recurring:true,  quota:10,  quota_unit:'Owner',   usage:53,  warn:false },
+  { id:5,  title:'Klassen',                                      cost:300,   type:'licence', recurring:true,  quota:1,   quota_unit:'Owner',   usage:79,  warn:false },
+  { id:14, title:'Premium (Lehrperson)',                         cost:300,   type:'licence', recurring:true,  quota:1,   quota_unit:'Unit',    usage:20,  warn:false },
+  { id:15, title:'NFR',                                          cost:1800,  type:'licence', recurring:true,  quota:1,   quota_unit:'Unit',    usage:2,   warn:false },
+  { id:18, title:'Professional für Schulen (S)',                 cost:1000,  type:'licence', recurring:true,  quota:10,  quota_unit:'Owner',   usage:21,  warn:true, warnText:'Defektes HTML in Beschreibung' },
+  { id:19, title:'Professional (S)',                             cost:1800,  type:'licence', recurring:true,  quota:10,  quota_unit:'Owner',   usage:1,   warn:false },
+  { id:29, title:'Hazu Teach',                                   cost:180,   type:'licence', recurring:true,  quota:1,   quota_unit:'Admin',   usage:1,   warn:false },
+  { id:30, title:'Hazu wallis2030.ch',                           cost:1000,  type:'licence', recurring:true,  quota:1,   quota_unit:'Unit',    usage:1,   warn:false },
+  { id:32, title:'Hazu Skills (Owner)',                          cost:100,   type:'licence', recurring:true,  quota:1,   quota_unit:'Owner',   usage:52,  warn:true, warnText:'Gleicher Titel wie ID 40' },
+  { id:36, title:'Event-Lizenz',                                 cost:1000,  type:'licence', recurring:false, quota:1,   quota_unit:'Unit',    usage:3,   warn:false },
+  { id:38, title:'Lizenz erweiterter Lese-Zugriff',              cost:5,     type:'licence', recurring:true,  quota:1,   quota_unit:'User',    usage:0,   warn:false },
+  { id:39, title:'Berufsbildungs-Lizenz (BZE)',                  cost:144,   type:'licence', recurring:true,  quota:1,   quota_unit:'User',    usage:1,   warn:false },
+  { id:40, title:'Hazu Skills (User)',                           cost:36,    type:'licence', recurring:true,  quota:1,   quota_unit:'User',    usage:1,   warn:true, warnText:'Gleicher Titel wie ID 32' },
+  { id:42, title:'Lizenz für Berufsschulen (inkl. ÜK)',          cost:95,    type:'licence', recurring:true,  quota:1,   quota_unit:'User',    usage:3,   warn:false },
+  { id:43, title:'Lizenz betriebliche Bildung',                  cost:300,   type:'licence', recurring:true,  quota:1,   quota_unit:'User',    usage:1,   warn:false },
+  { id:45, title:'Storage-Lizenz Professional 1 Jahr',           cost:150,   type:'licence', recurring:true,  quota:1,   quota_unit:'Reader',  usage:0,   warn:true, warnText:'billing_account = 150 (wahrscheinlich falsch)' },
+  { id:46, title:'Storage-Lizenz Professional 3 Jahre',          cost:300,   type:'licence', recurring:true,  quota:1,   quota_unit:'Reader',  usage:1,   warn:true, warnText:'Tippfehler "Sotrage" + billing_account = 300' },
+  { id:47, title:'Storage-Lizenz Professional 5 Jahre',          cost:450,   type:'licence', recurring:true,  quota:1,   quota_unit:'Reader',  usage:1,   warn:true, warnText:'Tippfehler "Sotrage" + billing_account = 450' },
+  // ADDONS
+  { id:7,  title:'Genius 100',                                   cost:600,   type:'addon',   recurring:true,  quota:100, quota_unit:'Credits', usage:70,  warn:false },
+  { id:20, title:'Hazu Automation',                              cost:300,   type:'addon',   recurring:true,  quota:1,   quota_unit:'Unit',    usage:3,   warn:false },
+  { id:25, title:'Genius 200',                                   cost:1050,  type:'addon',   recurring:true,  quota:200, quota_unit:'Credits', usage:10,  warn:false },
+  { id:26, title:'Genius 50',                                    cost:350,   type:'addon',   recurring:true,  quota:50,  quota_unit:'Credits', usage:8,   warn:true, warnText:'Preis in Beschreibung falsch (steht CHF 600)' },
+  { id:27, title:'Genius 20',                                    cost:150,   type:'addon',   recurring:true,  quota:20,  quota_unit:'Credits', usage:12,  warn:true, warnText:'HTML-Entities statt Sonderzeichen' },
+  { id:28, title:'Genius 10',                                    cost:85,    type:'addon',   recurring:true,  quota:10,  quota_unit:'Credits', usage:6,   warn:true, warnText:'Preis in Beschreibung falsch (steht CHF 600)' },
+  { id:8,  title:'Mirroco',                                      cost:800,   type:'addon',   recurring:true,  quota:1,   quota_unit:'Klasse',  usage:0,   warn:false },
+  { id:41, title:'Hazu Analytics',                               cost:300,   type:'addon',   recurring:true,  quota:1,   quota_unit:'Unit',    usage:1,   warn:false },
+  // PROJECTS
+  { id:12, title:'Projekt – Individuell nach Auftrag',           cost:200,   type:'project', recurring:false, quota:1,   quota_unit:'Stunde',  usage:141, warn:false },
+  { id:17, title:'Hazu Setup',                                   cost:1600,  type:'project', recurring:false, quota:1,   quota_unit:'Unit',    usage:30,  warn:false },
+  { id:22, title:'Hazu Setup (S)',                               cost:600,   type:'project', recurring:false, quota:1,   quota_unit:'Unit',    usage:18,  warn:false },
+  { id:31, title:'Reisespesen',                                  cost:100,   type:'project', recurring:false, quota:1,   quota_unit:'Unit',    usage:32,  warn:false },
+  { id:37, title:'Projekt – Individuell (Lernender)',            cost:80,    type:'project', recurring:false, quota:1,   quota_unit:'Stunde',  usage:12,  warn:false },
+  { id:44, title:'Erfassung Bildungsplan Beruf',                 cost:300,   type:'project', recurring:false, quota:1,   quota_unit:'Unit',    usage:0,   warn:false },
+  // TRAINING
+  { id:10, title:'Training 1',                                   cost:1000,  type:'training',recurring:false, quota:1,   quota_unit:'Unit',    usage:5,   warn:true, warnText:'Kein Titel, keine Beschreibung' },
+  { id:11, title:'Training 2',                                   cost:1000,  type:'training',recurring:false, quota:1,   quota_unit:'Unit',    usage:0,   warn:true, warnText:'Kein Titel, keine Beschreibung, 0 Verwendungen' },
+  { id:23, title:'Schulung ganzer Tag',                          cost:1600,  type:'training',recurring:false, quota:1,   quota_unit:'Unit',    usage:33,  warn:false },
+  { id:24, title:'Schulung halber Tag',                          cost:1000,  type:'training',recurring:false, quota:1,   quota_unit:'Unit',    usage:18,  warn:false },
+  { id:33, title:'Support-Paket Silber (10 Std.)',               cost:1800,  type:'training',recurring:false, quota:1,   quota_unit:'Unit',    usage:4,   warn:false },
+  { id:34, title:'Support-Paket Gold (20 Std.)',                 cost:3400,  type:'training',recurring:false, quota:1,   quota_unit:'Unit',    usage:1,   warn:false },
+  { id:35, title:'Support-Paket Platin (40 Std.)',               cost:6500,  type:'training',recurring:false, quota:1,   quota_unit:'Unit',    usage:1,   warn:false },
+  // MODUL
+  { id:6,  title:'Lehrveranstaltungen',                          cost:3000,  type:'modul',   recurring:false, quota:1,   quota_unit:'Unit',    usage:1,   warn:false },
+  { id:16, title:'Hazu für Schulen',                             cost:2400,  type:'modul',   recurring:false, quota:1,   quota_unit:'Unit',    usage:26,  warn:false },
+  { id:21, title:'Hazu für Schulen (S)',                         cost:800,   type:'modul',   recurring:false, quota:1,   quota_unit:'Unit',    usage:16,  warn:false },
+  // CONTENT
+  { id:9,  title:'Lehrplan 21',                                  cost:0,     type:'content', recurring:false, quota:1,   quota_unit:'Unit',    usage:0,   warn:false },
+  // DISCOUNT
+  { id:13, title:'Rabatt',                                       cost:0,     type:'discount',recurring:false, quota:1,   quota_unit:'Unit',    usage:1,   warn:false },
+];
+
+const MAX_USAGE = Math.max(...PRODUCTS.map(p => p.usage));
+
+function formatCHF(n) {
+  if (n === 0) return 'CHF 0';
+  return 'CHF ' + n.toLocaleString('de-CH');
+}
+
+function renderCard(p) {
+  const color = TYPE_COLORS[p.type] || '#888';
+  const pct = Math.round((p.usage / MAX_USAGE) * 100);
+  return `
+    <div class="card" data-type="${p.type}" data-title="${p.title.toLowerCase()}">
+      <div class="card-accent" style="background:${color}"></div>
+      <div class="card-top">
+        <div class="card-title">
+          ${p.warn ? `<span class="warn-dot" title="${p.warnText || 'Prüfen'}"></span>` : ''}
+          ${p.title}
+        </div>
+        <div class="card-price">
+          ${formatCHF(p.cost)}
+          <span class="per">/ ${p.quota_unit}</span>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span class="badge" style="background:${color}18; color:${color}">${TYPE_LABELS[p.type]}</span>
+        <span class="badge ${p.recurring ? 'badge-recurring' : 'badge-onetime'}">${p.recurring ? 'Wiederkehrend' : 'Einmalig'}</span>
+        ${p.warn ? `<span class="badge" style="background:#fff3e0;color:#e65100;font-size:9px" title="${p.warnText}">⚠ Prüfen</span>` : ''}
+      </div>
+      <div class="usage-bar-wrap">
+        <div class="usage-label">Verwendungen <span>${p.usage}×</span></div>
+        <div class="usage-bar-bg">
+          <div class="usage-bar-fill" style="width:${pct}%; background:${color}"></div>
+        </div>
+      </div>
+      <div class="card-id">#${p.id}</div>
+    </div>`;
+}
+
+// Build grid
+document.getElementById('grid').innerHTML = PRODUCTS.map(renderCard).join('');
+
+// Build charts
+const typeStats = {};
+PRODUCTS.forEach(p => {
+  if (!typeStats[p.type]) typeStats[p.type] = { count: 0, usage: 0 };
+  typeStats[p.type].count++;
+  typeStats[p.type].usage += p.usage;
+});
+const maxCount = Math.max(...Object.values(typeStats).map(v => v.count));
+const maxUsage = Math.max(...Object.values(typeStats).map(v => v.usage));
+
+const types = ['licence','addon','project','training','modul','content','discount'];
+document.getElementById('countChart').innerHTML = types.map(t => {
+  const s = typeStats[t] || { count: 0 };
+  const w = Math.round((s.count / maxCount) * 100);
+  return `<div class="bar-row">
+    <div class="bar-label">${TYPE_LABELS[t]}</div>
+    <div class="bar-outer">
+      <div class="bar-inner" style="width:${w}%; background:${TYPE_COLORS[t]}">
+        <span>${s.count}</span>
+      </div>
+    </div>
+  </div>`;
+}).join('');
+
+document.getElementById('usageChart').innerHTML = types.map(t => {
+  const s = typeStats[t] || { usage: 0 };
+  const w = Math.round((s.usage / maxUsage) * 100);
+  return `<div class="bar-row">
+    <div class="bar-label">${TYPE_LABELS[t]}</div>
+    <div class="bar-outer">
+      <div class="bar-inner" style="width:${Math.max(w,2)}%; background:${TYPE_COLORS[t]}">
+        <span>${s.usage}×</span>
+      </div>
+    </div>
+  </div>`;
+}).join('');
+
+// Filter
+function filter(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.card').forEach(card => {
+    card.classList.toggle('hidden', type !== 'all' && card.dataset.type !== type);
+  });
+}
+
+// Search
+function search(val) {
+  const q = val.toLowerCase();
+  document.querySelectorAll('.card').forEach(card => {
+    card.classList.toggle('hidden', q.length > 0 && !card.dataset.title.includes(q));
+  });
+  // Reset filter buttons
+  if (q.length > 0) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  }
+}
+</script>
+</body>
+</html>
