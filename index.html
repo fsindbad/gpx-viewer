@@ -2,10 +2,50 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="refresh" content="0; url=sailing-tracker-3d.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Franks Sailing Tracker</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      text-align: center;
+      max-width: 400px;
+    }
+    h1 { font-size: 1.8em; font-weight: 300; margin-bottom: 24px; }
+    a {
+      display: block;
+      background: #0f3460;
+      color: #eee;
+      text-decoration: none;
+      padding: 14px 24px;
+      border-radius: 8px;
+      margin: 10px 0;
+      font-size: 1em;
+      transition: background 0.2s;
+    }
+    a:hover { background: #e94560; }
+    .sub { color: #8899aa; font-size: 0.8em; margin-top: 4px; }
+  </style>
 </head>
 <body>
-  <p><a href="sailing-tracker-3d.html">Weiter zum Sailing Tracker</a></p>
+  <div class="card">
+    <h1>Franks Sailing Tracker</h1>
+    <a href="sailing-tracker-3d.html">
+      2D / 3D Sailing Tracker
+      <div class="sub">CesiumJS Globe + Leaflet Map</div>
+    </a>
+    <a href="gpx-viewer.html">
+      2D GPX Viewer
+      <div class="sub">Leaflet Map only</div>
+    </a>
+  </div>
 </body>
 </html>
