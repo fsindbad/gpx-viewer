@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Franks Sailing Tracker — 2D/3D</title>
+
+  <!-- Leaflet (2D) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+
+  <!-- CesiumJS (3D) -->
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --bg2: #16213e;
+      --accent: #0f3460;
+      --highlight: #e94560;
+      --text: #eee;
+      --text-dim: #8899aa;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'SF Pro Display', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* === HEADER === */
+    #header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 16px; background: var(--bg2);
+      border-bottom: 1px solid var(--accent);
+      z-index: 1001; flex-shrink: 0;
+    }
+    #header h1 { font-size: 1.1em; font-weight: 600; letter-spacing: 0.5px; }
+    #header .controls { display: flex; gap: 6px; align-items: center; }
+
+    .btn {
+      background: var(--accent); color: var(--text); border: none;
+      padding: 6px 14px; border-radius: 6px; font-size: 0.85em;
+      cursor: pointer; transition: background 0.2s; font-family: inherit;
+    }
+    .btn:hover { background: var(--highlight); }
+    .btn.active { background: var(--highlight); }
+    input[type="file"] { display: none; }
+
+    .view-toggle {
+      display: flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--accent);
+    }
+    .view-toggle .btn { border-radius: 0; border: none; padding: 6px 12px; }
+
+    /* === MAIN === */
+    #main { display: flex; flex: 1; min-height: 0; position: relative; }
+
+    #map-2d, #globe-3d {
+      position: absolute; top: 0; left: 0; right: 320px; bottom: 0;
+      transition: opacity 0.3s;
+    }
+    #map-2d.hidden, #globe-3d.hidden { opacity: 0; pointer-events: none; z-index: 0; }
+    #map-2d:not(.hidden), #globe-3d:not(.hidden) { z-index: 1; }
+
+    .leaflet-container { background: #0a0a1a; height: 100%; }
+
+    /* Hide Cesium default UI clutter */
+    .cesium-viewer-toolbar,
+    .cesium-viewer-animationContainer,
+    .cesium-viewer-timelineContainer,
+    .cesium-viewer-fullscreenContainer,
+    .cesium-viewer-infoBoxContainer,
+    .cesium-viewer-selectionIndicatorContainer,
+    .cesium-viewer-bottom { display: none !important; }
+    .cesium-widget-credits { display: none !important; }
+    .cesium-viewer .cesium-widget { border: none !important; }
+
+    /* === SIDE PANEL === */
+    #panel {
+      width: 320px; background: var(--bg2);
+      border-left: 1px solid var(--accent);
+      overflow-y: auto; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      position: absolute; right: 0; top: 0; bottom: 0; z-index: 2;
+    }
+
+    .panel-section { padding: 12px 16px; border-bottom: 1px solid var(--accent); }
+    .panel-section h3 {
+      font-size: 0.75em; text-transform: uppercase;
+      letter-spacing: 1.5px; color: var(--text-dim); margin-bottom: 8px;
+    }
+
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-box { background: var(--accent); border-radius: 8px; padding: 10px; }
+    .stat-box .label { font-size: 0.7em; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-box .value { font-size: 1.3em; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stat-box .unit { font-size: 0.7em; color: var(--text-dim); margin-left: 2px; }
+
+    #speed-chart { width: 100%; height: 100px; cursor: crosshair; }
+    .legend { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+    .legend-bar {
+      flex: 1; height: 8px; border-radius: 4px;
+      background: linear-gradient(to right, #313695,#4575b4,#74add1,#abd9e9,#fee090,#fdae61,#f46d43,#d73027);
+    }
+    .legend span { font-size: 0.7em; color: var(--text-dim); flex-shrink: 0; }
+
+    /* === TIMELINE === */
+    #timeline {
+      background: var(--bg2); border-top: 1px solid var(--accent);
+      padding: 8px 16px; display: flex; align-items: center;
+      gap: 12px; flex-shrink: 0; z-index: 1001;
+    }
+    #timeline .play-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--highlight); border: none; color: white;
+      font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    #timeline .time-display {
+      font-size: 0.85em; font-variant-numeric: tabular-nums;
+      color: var(--text-dim); min-width: 120px; flex-shrink: 0;
+    }
+    #timeline input[type="range"] {
+      flex: 1; height: 6px; -webkit-appearance: none; appearance: none;
+      background: var(--accent); border-radius: 3px; outline: none;
+    }
+    #timeline input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: var(--highlight); cursor: pointer;
+    }
+    .speed-select {
+      background: var(--accent); color: var(--text); border: none;
+      padding: 4px 8px; border-radius: 4px; font-size: 0.8em;
+      font-family: inherit; cursor: pointer;
+    }
+
+    /* === TOOLTIP === */
+    .point-info {
+      background: var(--bg2) !important; border: 1px solid var(--accent) !important;
+      border-radius: 8px !important; padding: 8px 12px !important;
+      font-size: 0.8em !important; line-height: 1.6 !important;
+      color: var(--text) !important; box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
+    }
+    .point-info .val { font-weight: 700; color: var(--highlight); }
+    .leaflet-popup-content-wrapper { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+    .leaflet-popup-tip { display: none !important; }
+    .leaflet-popup-close-button { color: var(--text-dim) !important; }
+
+    /* === EMPTY STATE === */
+    #empty-state {
+      position: absolute; top: 50%; left: calc(50% - 160px);
+      transform: translate(-50%, -50%);
+      text-align: center; z-index: 500; pointer-events: none;
+    }
+    #empty-state h2 { font-size: 1.6em; margin-bottom: 8px; font-weight: 300; }
+    #empty-state p { color: var(--text-dim); font-size: 0.95em; }
+
+    /* === CAMERA MODE BADGE === */
+    #camera-mode {
+      position: absolute; top: 10px; left: 10px; z-index: 1000;
+      background: var(--panel-bg, rgba(22,33,62,0.9)); padding: 6px 12px;
+      border-radius: 6px; font-size: 0.8em; display: none;
+      border: 1px solid var(--accent);
+    }
+
+    /* === RESPONSIVE === */
+    @media (max-width: 768px) {
+      #panel { display: none; }
+      #map-2d, #globe-3d { right: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <h1>Franks Sailing Tracker</h1>
+    <div class="controls">
+      <label class="btn" for="gpx-file">GPX laden</label>
+      <input type="file" id="gpx-file" accept=".gpx" />
+
+      <div class="view-toggle">
+        <button class="btn active" id="btn-2d">2D</button>
+        <button class="btn" id="btn-3d">3D</button>
+      </div>
+
+      <button class="btn" id="btn-follow">Follow</button>
+      <button class="btn" id="btn-fit">Fit</button>
+      <button class="btn" id="btn-clear">Clear</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="map-2d"></div>
+    <div id="globe-3d" class="hidden"></div>
+
+    <div id="empty-state">
+      <h2>GPX-Datei laden</h2>
+      <p>Lade eine Sailing-GPX um den Track in 2D oder 3D zu analysieren</p>
+    </div>
+
+    <div id="camera-mode">Kamera: Follow</div>
+
+    <div id="panel">
+      <div class="panel-section">
+        <h3>Track Info</h3>
+        <div id="track-name" style="font-size:0.9em; margin-bottom:8px; color:var(--text-dim);">—</div>
+        <div class="stat-grid">
+          <div class="stat-box">
+            <div class="label">Distanz</div>
+            <div><span class="value" id="stat-dist">—</span><span class="unit">km</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Dauer</div>
+            <div><span class="value" id="stat-dur">—</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Max Speed</div>
+            <div><span class="value" id="stat-maxspd">—</span><span class="unit">kn</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Avg Speed</div>
+            <div><span class="value" id="stat-avgspd">—</span><span class="unit">kn</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Max Speed</div>
+            <div><span class="value" id="stat-maxspd-kmh">—</span><span class="unit">km/h</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Avg Speed</div>
+            <div><span class="value" id="stat-avgspd-kmh">—</span><span class="unit">km/h</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Punkte</div>
+            <div><span class="value" id="stat-points">—</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Intervall</div>
+            <div><span class="value" id="stat-interval">—</span><span class="unit">s</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section" style="flex:1; min-height:120px;">
+        <h3>Speed-Profil</h3>
+        <canvas id="speed-chart"></canvas>
+        <div class="legend">
+          <span>0</span>
+          <div class="legend-bar"></div>
+          <span id="legend-max">kn</span>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Aktueller Punkt</h3>
+        <div id="current-point" style="font-size:0.85em; color:var(--text-dim);">
+          Bewege den Slider oder klicke auf den Track
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="timeline">
+    <button class="play-btn" id="btn-play">&#9654;</button>
+    <span class="time-display" id="time-display">00:00:00</span>
+    <input type="range" id="slider" min="0" max="1000" value="0" step="1" />
+    <select class="speed-select" id="playback-speed">
+      <option value="1">1x</option>
+      <option value="2">2x</option>
+      <option value="5" selected>5x</option>
+      <option value="10">10x</option>
+      <option value="20">20x</option>
+      <option value="50">50x</option>
+    </select>
+  </div>
+
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+
+  <script>
+'use strict';
+
+// ============================================================
+// GPX PARSER
+// ============================================================
+function parseGPX(xmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'text/xml');
+  const nameEl = doc.querySelector('name');
+  const name = nameEl ? nameEl.textContent : 'Unnamed Track';
+  const trkpts = doc.querySelectorAll('trkpt');
+  const points = [];
+  trkpts.forEach(pt => {
+    const lat = parseFloat(pt.getAttribute('lat'));
+    const lon = parseFloat(pt.getAttribute('lon'));
+    const eleEl = pt.querySelector('ele');
+    const timeEl = pt.querySelector('time');
+    const speedEl = pt.querySelector('speed');
+    points.push({
+      lat, lon,
+      ele: eleEl ? parseFloat(eleEl.textContent) : 0,
+      time: timeEl ? new Date(timeEl.textContent) : null,
+      gpsSpeed: speedEl ? parseFloat(speedEl.textContent) : null,
+      speed: 0, speedKn: 0, speedKmh: 0,
+      heading: 0, distance: 0, totalDist: 0,
+    });
+  });
+  return { name, points };
+}
+
+// ============================================================
+// ANALYTICS
+// ============================================================
+const R_EARTH = 6371000;
+const DEG = Math.PI / 180;
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const dLat = (lat2-lat1)*DEG, dLon = (lon2-lon1)*DEG;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*DEG)*Math.cos(lat2*DEG)*Math.sin(dLon/2)**2;
+  return R_EARTH * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function calcBearing(lat1, lon1, lat2, lon2) {
+  const dLon = (lon2-lon1)*DEG;
+  const y = Math.sin(dLon)*Math.cos(lat2*DEG);
+  const x = Math.cos(lat1*DEG)*Math.sin(lat2*DEG) - Math.sin(lat1*DEG)*Math.cos(lat2*DEG)*Math.cos(dLon);
+  return ((Math.atan2(y, x) / DEG) + 360) % 360;
+}
+
+function analyzeTrack(points) {
+  let totalDist = 0;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i-1], curr = points[i];
+    const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
+    curr.distance = dist;
+    totalDist += dist;
+    curr.totalDist = totalDist;
+    if (curr.gpsSpeed !== null && curr.gpsSpeed > 0) {
+      curr.speed = curr.gpsSpeed;
+    } else if (curr.time && prev.time) {
+      const dt = (curr.time - prev.time) / 1000;
+      curr.speed = dt > 0 ? dist / dt : 0;
+    }
+    curr.speedKn = curr.speed * 1.94384;
+    curr.speedKmh = curr.speed * 3.6;
+    curr.heading = calcBearing(prev.lat, prev.lon, curr.lat, curr.lon);
+  }
+  if (points.length > 1) points[0].heading = points[1].heading;
+  const speeds = points.map(p => p.speedKn);
+  const moving = speeds.filter(s => s > 0.5);
+  const duration = points.length > 1 && points[0].time && points[points.length-1].time
+    ? (points[points.length-1].time - points[0].time) / 1000 : 0;
+  const avgInt = points.length > 1 && duration > 0 ? duration / (points.length-1) : 0;
+  return {
+    totalDist, duration,
+    maxSpeed: Math.max(...speeds),
+    avgSpeed: moving.length > 0 ? moving.reduce((a,b)=>a+b,0)/moving.length : 0,
+    pointCount: points.length,
+    avgInterval: Math.round(avgInt),
+  };
+}
+
+// ============================================================
+// SPEED COLOR
+// ============================================================
+function speedColor(speed, maxSpeed) {
+  if (maxSpeed <= 0) return '#666';
+  const t = Math.min(speed / maxSpeed, 1);
+  const stops = [
+    [0.00,49,54,149],[0.15,69,117,180],[0.30,116,173,209],
+    [0.45,171,217,233],[0.55,254,224,144],[0.70,253,174,97],
+    [0.85,244,109,67],[1.00,215,48,39],
+  ];
+  let lo = stops[0], hi = stops[stops.length-1];
+  for (let i = 0; i < stops.length-1; i++) {
+    if (t >= stops[i][0] && t <= stops[i+1][0]) { lo = stops[i]; hi = stops[i+1]; break; }
+  }
+  const f = (hi[0]-lo[0]) > 0 ? (t-lo[0])/(hi[0]-lo[0]) : 0;
+  const r = Math.round(lo[1]+f*(hi[1]-lo[1]));
+  const g = Math.round(lo[2]+f*(hi[2]-lo[2]));
+  const b = Math.round(lo[3]+f*(hi[3]-lo[3]));
+  return `rgb(${r},${g},${b})`;
+}
+
+function speedColorCesium(speed, maxSpeed) {
+  if (maxSpeed <= 0) return Cesium.Color.GRAY;
+  const t = Math.min(speed / maxSpeed, 1);
+  const stops = [
+    [0.00,49,54,149],[0.15,69,117,180],[0.30,116,173,209],
+    [0.45,171,217,233],[0.55,254,224,144],[0.70,253,174,97],
+    [0.85,244,109,67],[1.00,215,48,39],
+  ];
+  let lo = stops[0], hi = stops[stops.length-1];
+  for (let i = 0; i < stops.length-1; i++) {
+    if (t >= stops[i][0] && t <= stops[i+1][0]) { lo = stops[i]; hi = stops[i+1]; break; }
+  }
+  const f = (hi[0]-lo[0]) > 0 ? (t-lo[0])/(hi[0]-lo[0]) : 0;
+  return new Cesium.Color(
+    (lo[1]+f*(hi[1]-lo[1]))/255,
+    (lo[2]+f*(hi[2]-lo[2]))/255,
+    (lo[3]+f*(hi[3]-lo[3]))/255,
+    1.0
+  );
+}
+
+// ============================================================
+// 2D MAP (Leaflet)
+// ============================================================
+const leafletMap = L.map('map-2d', { zoomControl: true }).setView([47.23, 8.80], 14);
+
+const tileLayers = {
+  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19, attribution: '&copy; Esri'
+  }),
+  'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OSM'
+  }),
+  'Topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17, attribution: '&copy; OpenTopoMap'
+  }),
+};
+tileLayers['Satellite'].addTo(leafletMap);
+L.control.layers(tileLayers, null, { position: 'topright' }).addTo(leafletMap);
+
+// ============================================================
+// 3D GLOBE (CesiumJS)
+// ============================================================
+// *** HINWEIS: Für Cesium Ion Terrain/Imagery brauchst du einen
+// *** kostenlosen Token von https://cesium.com/ion/signup
+// *** Ohne Token funktioniert die 3D-Ansicht mit OSM-Tiles.
+let cesiumViewer = null;
+let cesiumReady = false;
+
+function initCesium() {
+  if (cesiumReady) return;
+
+  // Try with token, fallback to open tiles
+  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxMjhkMjgyYy1hY2UxLTQ5ODMtODRlNi04NGNkYWVjNDA1NTgiLCJpZCI6NDE3MTY3LCJpYXQiOjE3NzYwMDg4MTZ9.3Ug9RQFqg6DAmN2LWVAVnmH-YHH7OIDS_9U2tRDnJsw';
+
+  try {
+    // Mit Ion Token: Cesium lädt automatisch Bing Satellite + World Terrain
+    cesiumViewer = new Cesium.Viewer('globe-3d', {
+      animation: false,
+      timeline: false,
+      fullscreenButton: false,
+      homeButton: false,
+      geocoder: false,
+      navigationHelpButton: false,
+      sceneModePicker: false,
+      baseLayerPicker: false,
+      infoBox: false,
+      selectionIndicator: false,
+      creditContainer: document.createElement('div'),
+      // Kein imageryProvider/terrainProvider = Cesium Ion defaults (Bing + World Terrain)
+    });
+
+    cesiumViewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0a2e');
+    cesiumViewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0a0a2e');
+    cesiumViewer.scene.fog.enabled = true;
+    cesiumViewer.scene.globe.enableLighting = false;
+
+    cesiumReady = true;
+  } catch (e) {
+    console.warn('CesiumJS init with Ion failed, trying OSM fallback:', e);
+    try {
+      cesiumViewer = new Cesium.Viewer('globe-3d', {
+        animation: false, timeline: false, fullscreenButton: false,
+        homeButton: false, geocoder: false, navigationHelpButton: false,
+        sceneModePicker: false, baseLayerPicker: false, infoBox: false,
+        selectionIndicator: false,
+        creditContainer: document.createElement('div'),
+        imageryProvider: new Cesium.OpenStreetMapImageryProvider({
+          url: 'https://a.tile.openstreetmap.org/',
+        }),
+        terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+      });
+      cesiumViewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0a2e');
+      cesiumReady = true;
+    } catch (e2) {
+      console.error('CesiumJS completely failed:', e2);
+      alert('3D-Ansicht konnte nicht geladen werden. Bitte prüfe deine Internetverbindung.');
+    }
+  }
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let trackData = null, trackStats = null;
+let leafletLayers = [], boatMarker2d = null, trackBounds = null;
+let cesiumEntities = [];
+let boatEntity3d = null;
+let currentView = '2d'; // '2d' or '3d'
+let followMode = false;
+let isPlaying = false, playbackTimer = null, currentIndex = 0, lastFrameTime = 0;
+
+const boatSVG = `<svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+  <polygon points="12,2 4,20 12,16 20,20" fill="#e94560" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>`;
+
+function createBoatIcon(heading) {
+  return L.divIcon({
+    html: `<div style="transform:rotate(${heading}deg);width:24px;height:24px;">${boatSVG}</div>`,
+    className: '', iconSize: [24,24], iconAnchor: [12,12],
+  });
+}
+
+// ============================================================
+// VIEW TOGGLE
+// ============================================================
+function setView(mode) {
+  currentView = mode;
+  const el2d = document.getElementById('map-2d');
+  const el3d = document.getElementById('globe-3d');
+  const btn2d = document.getElementById('btn-2d');
+  const btn3d = document.getElementById('btn-3d');
+
+  if (mode === '2d') {
+    el2d.classList.remove('hidden');
+    el3d.classList.add('hidden');
+    btn2d.classList.add('active');
+    btn3d.classList.remove('active');
+    setTimeout(() => leafletMap.invalidateSize(), 50);
+  } else {
+    if (!cesiumReady) initCesium();
+    el3d.classList.remove('hidden');
+    el2d.classList.add('hidden');
+    btn3d.classList.add('active');
+    btn2d.classList.remove('active');
+    if (trackData) renderTrack3D();
+    if (cesiumViewer) cesiumViewer.scene.requestRender();
+  }
+}
+
+// ============================================================
+// CLEAR
+// ============================================================
+function clearTrack() {
+  // 2D
+  leafletLayers.forEach(l => leafletMap.removeLayer(l));
+  leafletLayers = [];
+  if (boatMarker2d) { leafletMap.removeLayer(boatMarker2d); boatMarker2d = null; }
+
+  // 3D
+  if (cesiumViewer) cesiumViewer.entities.removeAll();
+  boatEntity3d = null;
+  cesiumEntities = [];
+
+  trackData = null; trackStats = null; trackBounds = null;
+  stopPlayback();
+  updateStatsPanel();
+  document.getElementById('empty-state').style.display = 'block';
+}
+
+// ============================================================
+// RENDER 2D
+// ============================================================
+function renderTrack2D() {
+  leafletLayers.forEach(l => leafletMap.removeLayer(l));
+  leafletLayers = [];
+  if (boatMarker2d) { leafletMap.removeLayer(boatMarker2d); boatMarker2d = null; }
+
+  if (!trackData || !trackStats) return;
+
+  const maxSpd = trackStats.maxSpeed;
+  const pts = trackData.points;
+
+  for (let i = 1; i < pts.length; i++) {
+    const color = speedColor(pts[i].speedKn, maxSpd);
+    const seg = L.polyline(
+      [[pts[i-1].lat, pts[i-1].lon], [pts[i].lat, pts[i].lon]],
+      { color, weight: 4, opacity: 0.9 }
+    );
+    seg.on('mouseover', function(e) {
+      L.popup().setLatLng(e.latlng).setContent(`<div class="point-info">
+        <b>Speed:</b> <span class="val">${pts[i].speedKn.toFixed(1)} kn</span> (${pts[i].speedKmh.toFixed(1)} km/h)<br>
+        <b>Heading:</b> <span class="val">${pts[i].heading.toFixed(0)}°</span><br>
+        <b>Dist:</b> <span class="val">${(pts[i].totalDist/1000).toFixed(2)} km</span><br>
+        ${pts[i].time ? `<b>Zeit:</b> ${pts[i].time.toLocaleTimeString('de-CH')}` : ''}
+      </div>`).openOn(leafletMap);
+    });
+    seg.on('click', () => goToPoint(i));
+    seg.addTo(leafletMap); leafletLayers.push(seg);
+  }
+
+  // Start/End
+  const s = L.circleMarker([pts[0].lat, pts[0].lon], {
+    radius: 8, color: '#00ff88', fillColor: '#00ff88', fillOpacity: 0.9, weight: 2
+  }).bindTooltip('Start', { permanent: true, direction: 'top', className: 'point-info' });
+  s.addTo(leafletMap); leafletLayers.push(s);
+
+  const e = L.circleMarker([pts[pts.length-1].lat, pts[pts.length-1].lon], {
+    radius: 8, color: '#e94560', fillColor: '#e94560', fillOpacity: 0.9, weight: 2
+  }).bindTooltip('Finish', { permanent: true, direction: 'top', className: 'point-info' });
+  e.addTo(leafletMap); leafletLayers.push(e);
+
+  boatMarker2d = L.marker([pts[0].lat, pts[0].lon], {
+    icon: createBoatIcon(pts[0].heading), zIndexOffset: 1000
+  }).addTo(leafletMap);
+  leafletLayers.push(boatMarker2d);
+
+  trackBounds = L.latLngBounds(pts.map(p => [p.lat, p.lon]));
+  leafletMap.fitBounds(trackBounds, { padding: [30, 30] });
+}
+
+// ============================================================
+// RENDER 3D
+// ============================================================
+function renderTrack3D() {
+  if (!cesiumViewer || !trackData || !trackStats) return;
+
+  cesiumViewer.entities.removeAll();
+  boatEntity3d = null;
+
+  const pts = trackData.points;
+  const maxSpd = trackStats.maxSpeed;
+
+  // Color-coded track segments as polylines
+  // Batch into groups of ~20 for performance
+  const batchSize = 20;
+  for (let start = 0; start < pts.length - 1; start += batchSize) {
+    const end = Math.min(start + batchSize, pts.length - 1);
+    const midIdx = Math.floor((start + end) / 2);
+    const color = speedColorCesium(pts[midIdx].speedKn, maxSpd);
+
+    const positions = [];
+    for (let i = start; i <= end; i++) {
+      positions.push(Cesium.Cartesian3.fromDegrees(pts[i].lon, pts[i].lat, 2));
+    }
+
+    cesiumViewer.entities.add({
+      polyline: {
+        positions: positions,
+        width: 4,
+        material: color,
+        clampToGround: false,
+      }
+    });
+  }
+
+  // Start marker
+  cesiumViewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(pts[0].lon, pts[0].lat, 5),
+    point: { pixelSize: 14, color: Cesium.Color.fromCssColorString('#00ff88'), outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
+    label: { text: 'Start', font: '12px sans-serif', fillColor: Cesium.Color.WHITE,
+             style: Cesium.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 2,
+             verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) }
+  });
+
+  // End marker
+  cesiumViewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(pts[pts.length-1].lon, pts[pts.length-1].lat, 5),
+    point: { pixelSize: 14, color: Cesium.Color.fromCssColorString('#e94560'), outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
+    label: { text: 'Finish', font: '12px sans-serif', fillColor: Cesium.Color.WHITE,
+             style: Cesium.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 2,
+             verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) }
+  });
+
+  // Boat entity (triangle)
+  boatEntity3d = cesiumViewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(pts[0].lon, pts[0].lat, 10),
+    point: { pixelSize: 18, color: Cesium.Color.fromCssColorString('#e94560'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3 },
+    label: {
+      text: '',
+      font: 'bold 13px sans-serif',
+      fillColor: Cesium.Color.WHITE,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      outlineColor: Cesium.Color.BLACK,
+      outlineWidth: 3,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -16),
+      showBackground: true,
+      backgroundColor: new Cesium.Color(0.06, 0.08, 0.15, 0.85),
+      backgroundPadding: new Cesium.Cartesian2(6, 4),
+    }
+  });
+
+  // Fly to track
+  cesiumViewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(
+      (pts[0].lon + pts[pts.length-1].lon) / 2,
+      (pts[0].lat + pts[pts.length-1].lat) / 2,
+      3000
+    ),
+    duration: 1.5,
+  });
+}
+
+// ============================================================
+// LOAD TRACK
+// ============================================================
+function loadTrack(data) {
+  clearTrack();
+  document.getElementById('empty-state').style.display = 'none';
+  trackData = data;
+  trackStats = analyzeTrack(data.points);
+  updateStatsPanel();
+  drawSpeedChart();
+
+  const slider = document.getElementById('slider');
+  slider.max = data.points.length - 1;
+  slider.value = 0;
+
+  renderTrack2D();
+  if (currentView === '3d' && cesiumReady) renderTrack3D();
+  goToPoint(0);
+}
+
+// ============================================================
+// STATS PANEL
+// ============================================================
+function updateStatsPanel() {
+  if (!trackData || !trackStats) {
+    ['track-name','stat-dist','stat-dur','stat-maxspd','stat-avgspd',
+     'stat-maxspd-kmh','stat-avgspd-kmh','stat-points','stat-interval'].forEach(
+      id => document.getElementById(id).textContent = '—');
+    return;
+  }
+  const s = trackStats;
+  document.getElementById('track-name').textContent = trackData.name;
+  document.getElementById('stat-dist').textContent = (s.totalDist/1000).toFixed(2);
+  document.getElementById('stat-dur').textContent = fmtDur(s.duration);
+  document.getElementById('stat-maxspd').textContent = s.maxSpeed.toFixed(1);
+  document.getElementById('stat-avgspd').textContent = s.avgSpeed.toFixed(1);
+  document.getElementById('stat-maxspd-kmh').textContent = (s.maxSpeed/1.94384*3.6).toFixed(1);
+  document.getElementById('stat-avgspd-kmh').textContent = (s.avgSpeed/1.94384*3.6).toFixed(1);
+  document.getElementById('stat-points').textContent = s.pointCount;
+  document.getElementById('stat-interval').textContent = s.avgInterval;
+  document.getElementById('legend-max').textContent = s.maxSpeed.toFixed(1) + ' kn';
+}
+
+function fmtDur(secs) {
+  const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = Math.floor(secs%60);
+  return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// ============================================================
+// SPEED CHART
+// ============================================================
+function drawSpeedChart() {
+  const canvas = document.getElementById('speed-chart');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width - 32; canvas.height = 100;
+  if (!trackData || !trackStats) { ctx.clearRect(0,0,canvas.width,canvas.height); return; }
+  const pts = trackData.points, maxSpd = trackStats.maxSpeed;
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  const barW = Math.max(1, w/pts.length);
+  for (let i = 0; i < pts.length; i++) {
+    const spd = pts[i].speedKn;
+    const barH = maxSpd > 0 ? (spd/maxSpd)*(h-4) : 0;
+    ctx.fillStyle = speedColor(spd, maxSpd);
+    ctx.fillRect((i/pts.length)*w, h-barH, barW+0.5, barH);
+  }
+  canvas.onclick = e => {
+    const idx = Math.floor((e.offsetX/w)*pts.length);
+    if (idx >= 0 && idx < pts.length) goToPoint(idx);
+  };
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function goToPoint(idx) {
+  if (!trackData) return;
+  const pts = trackData.points;
+  idx = Math.max(0, Math.min(idx, pts.length-1));
+  currentIndex = idx;
+  const pt = pts[idx];
+
+  // 2D boat
+  if (boatMarker2d) {
+    boatMarker2d.setLatLng([pt.lat, pt.lon]);
+    boatMarker2d.setIcon(createBoatIcon(pt.heading));
+  }
+  if (followMode && currentView === '2d') {
+    leafletMap.panTo([pt.lat, pt.lon], { animate: true, duration: 0.3 });
+  }
+
+  // 3D boat
+  if (boatEntity3d && cesiumReady) {
+    boatEntity3d.position = Cesium.Cartesian3.fromDegrees(pt.lon, pt.lat, 10);
+    boatEntity3d.label.text = `${pt.speedKn.toFixed(1)} kn`;
+  }
+  if (followMode && currentView === '3d' && cesiumViewer) {
+    const heading = Cesium.Math.toRadians(pt.heading);
+    cesiumViewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(pt.lon, pt.lat, 500),
+      orientation: {
+        heading: heading,
+        pitch: Cesium.Math.toRadians(-35),
+        roll: 0,
+      },
+      duration: 0.3,
+    });
+  }
+
+  // UI
+  document.getElementById('slider').value = idx;
+  if (pt.time) document.getElementById('time-display').textContent = pt.time.toLocaleTimeString('de-CH');
+  document.getElementById('current-point').innerHTML = `
+    <b>${pt.speedKn.toFixed(1)}</b> kn &nbsp;|&nbsp;
+    <b>${pt.speedKmh.toFixed(1)}</b> km/h &nbsp;|&nbsp;
+    ${pt.heading.toFixed(0)}° &nbsp;|&nbsp;
+    ${(pt.totalDist/1000).toFixed(2)} km`;
+
+  highlightChart(idx);
+}
+
+function highlightChart(idx) {
+  drawSpeedChart();
+  if (!trackData) return;
+  const canvas = document.getElementById('speed-chart');
+  const ctx = canvas.getContext('2d');
+  const x = (idx / trackData.points.length) * canvas.width;
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, canvas.height); ctx.stroke();
+}
+
+// ============================================================
+// PLAYBACK
+// ============================================================
+function togglePlayback() { isPlaying ? stopPlayback() : startPlayback(); }
+
+function startPlayback() {
+  if (!trackData) return;
+  isPlaying = true;
+  document.getElementById('btn-play').innerHTML = '&#9646;&#9646;';
+  lastFrameTime = performance.now();
+
+  function tick(now) {
+    if (!isPlaying || !trackData) return;
+    const delta = (now - lastFrameTime) / 1000;
+    lastFrameTime = now;
+    const speed = parseInt(document.getElementById('playback-speed').value);
+    const pts = trackData.points;
+
+    if (pts[currentIndex] && pts[currentIndex].time && currentIndex < pts.length-1) {
+      const interval = pts[currentIndex+1] && pts[currentIndex+1].time
+        ? (pts[currentIndex+1].time - pts[currentIndex].time) / 1000 : trackStats.avgInterval;
+      const advance = (delta * speed) / Math.max(interval, 0.1);
+      currentIndex += Math.max(1, Math.round(advance));
+    } else {
+      currentIndex += speed;
+    }
+
+    if (currentIndex >= pts.length) currentIndex = 0;
+    goToPoint(currentIndex);
+    playbackTimer = requestAnimationFrame(tick);
+  }
+  playbackTimer = requestAnimationFrame(tick);
+}
+
+function stopPlayback() {
+  isPlaying = false;
+  document.getElementById('btn-play').innerHTML = '&#9654;';
+  if (playbackTimer) { cancelAnimationFrame(playbackTimer); playbackTimer = null; }
+}
+
+// ============================================================
+// FIT VIEW
+// ============================================================
+function fitView() {
+  if (!trackData) return;
+  if (currentView === '2d' && trackBounds) {
+    leafletMap.fitBounds(trackBounds, { padding: [30,30] });
+  } else if (currentView === '3d' && cesiumViewer) {
+    const pts = trackData.points;
+    const positions = pts.map(p => Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 0));
+    cesiumViewer.camera.flyToBoundingSphere(
+      Cesium.BoundingSphere.fromPoints(positions),
+      { duration: 1.5, offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-60), 0) }
+    );
+  }
+}
+
+// ============================================================
+// EVENTS
+// ============================================================
+document.getElementById('gpx-file').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const data = parseGPX(ev.target.result);
+    if (data.points.length === 0) { alert('Keine Trackpoints gefunden.'); return; }
+    loadTrack(data);
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+document.getElementById('btn-2d').addEventListener('click', () => setView('2d'));
+document.getElementById('btn-3d').addEventListener('click', () => setView('3d'));
+document.getElementById('btn-fit').addEventListener('click', fitView);
+document.getElementById('btn-clear').addEventListener('click', clearTrack);
+document.getElementById('btn-play').addEventListener('click', togglePlayback);
+
+document.getElementById('btn-follow').addEventListener('click', function() {
+  followMode = !followMode;
+  this.classList.toggle('active', followMode);
+  document.getElementById('camera-mode').style.display = followMode ? 'block' : 'none';
+});
+
+document.getElementById('slider').addEventListener('input', function(e) {
+  stopPlayback();
+  goToPoint(parseInt(e.target.value));
+});
+
+window.addEventListener('keydown', function(e) {
+  if (e.code === 'Space') { e.preventDefault(); togglePlayback(); }
+  if (e.code === 'ArrowRight') { stopPlayback(); goToPoint(currentIndex+1); }
+  if (e.code === 'ArrowLeft') { stopPlayback(); goToPoint(currentIndex-1); }
+  if (e.code === 'KeyF') { followMode = !followMode;
+    document.getElementById('btn-follow').classList.toggle('active', followMode);
+    document.getElementById('camera-mode').style.display = followMode ? 'block' : 'none';
+  }
+});
+
+window.addEventListener('resize', () => {
+  if (trackData) drawSpeedChart();
+  if (currentView === '2d') leafletMap.invalidateSize();
+});
+
+// Drag & Drop
+document.body.addEventListener('dragover', e => e.preventDefault());
+document.body.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.toLowerCase().endsWith('.gpx')) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const data = parseGPX(ev.target.result);
+      if (data.points.length > 0) loadTrack(data);
+    };
+    reader.readAsText(file);
+  }
+});
+  </script>
+</body>
+</html>

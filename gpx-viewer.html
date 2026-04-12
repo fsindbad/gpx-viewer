@@ -3,195 +3,720 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Frankies Genius GPX Viewer</title>
-
-  <!-- Leaflet CSS von CDN -->
+  <title>Franks Sailing GPX Viewer</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-
   <style>
     :root {
-      font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-      line-height: 1.5;
-      font-weight: 400;
-      color-scheme: light dark;
-      color: rgba(255, 255, 255, 0.87);
-      background-color: #242424;
-      font-synthesis: none;
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+      --bg: #1a1a2e;
+      --bg2: #16213e;
+      --accent: #0f3460;
+      --highlight: #e94560;
+      --text: #eee;
+      --text-dim: #8899aa;
+      --panel-bg: rgba(22, 33, 62, 0.95);
     }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      margin: 0;
+      font-family: 'SF Pro Display', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
       display: flex;
-      place-items: center;
-      min-width: 320px;
-      min-height: 100vh;
+      flex-direction: column;
+      overflow: hidden;
     }
 
-    #app {
-      max-width: 1280px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 2rem;
-      text-align: center;
+    /* === HEADER === */
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--accent);
+      z-index: 1000;
+      flex-shrink: 0;
     }
 
-    h1 {
-      font-size: 3.2em;
-      line-height: 1.1;
-      margin-bottom: 1rem;
-    }
+    #header h1 { font-size: 1.1em; font-weight: 600; letter-spacing: 0.5px; }
+    #header .controls { display: flex; gap: 8px; align-items: center; }
 
-    input[type="file"] {
-      font-family: inherit;
-      font-size: 1em;
-      color: inherit;
+    .btn {
+      background: var(--accent);
+      color: var(--text);
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.85em;
       cursor: pointer;
-    }
-
-    button {
-      border-radius: 8px;
-      border: 1px solid transparent;
-      padding: 0.6em 1.2em;
-      font-size: 1em;
-      font-weight: 500;
+      transition: background 0.2s;
       font-family: inherit;
-      background-color: #1a1a1a;
-      color: inherit;
-      cursor: pointer;
-      transition: border-color 0.25s;
     }
-    button:hover {
-      border-color: #646cff;
+    .btn:hover { background: var(--highlight); }
+    .btn.active { background: var(--highlight); }
+    input[type="file"] { display: none; }
+
+    /* === MAIN LAYOUT === */
+    #main { display: flex; flex: 1; min-height: 0; }
+    #map { flex: 1; min-width: 0; }
+    .leaflet-container { background: #0a0a1a; }
+
+    /* === SIDE PANEL === */
+    #panel {
+      width: 320px;
+      background: var(--bg2);
+      border-left: 1px solid var(--accent);
+      overflow-y: auto;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
     }
 
-    #map {
-      height: 500px;
-      margin-top: 1rem;
+    .panel-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--accent);
+    }
+
+    .panel-section h3 {
+      font-size: 0.75em;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-box {
+      background: var(--accent);
       border-radius: 8px;
+      padding: 10px;
     }
 
-    #info {
-      margin-top: 0.8rem;
-      font-size: 0.9em;
-      color: #aaa;
-      min-height: 1.4em;
+    .stat-box .label {
+      font-size: 0.7em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
-    @media (prefers-color-scheme: light) {
-      :root {
-        color: #213547;
-        background-color: #ffffff;
-      }
-      button {
-        background-color: #f9f9f9;
-      }
-      #info {
-        color: #555;
-      }
+    .stat-box .value {
+      font-size: 1.3em;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-box .unit {
+      font-size: 0.7em;
+      color: var(--text-dim);
+      margin-left: 2px;
+    }
+
+    /* === SPEED CHART === */
+    #speed-chart { width: 100%; height: 100px; cursor: crosshair; }
+
+    .legend { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+    .legend-bar {
+      flex: 1; height: 8px; border-radius: 4px;
+      background: linear-gradient(to right, #313695, #4575b4, #74add1, #abd9e9, #fee090, #fdae61, #f46d43, #d73027);
+    }
+    .legend span { font-size: 0.7em; color: var(--text-dim); flex-shrink: 0; }
+
+    /* === TIMELINE === */
+    #timeline {
+      background: var(--bg2);
+      border-top: 1px solid var(--accent);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 1000;
+    }
+
+    #timeline .play-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--highlight); border: none; color: white;
+      font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    #timeline .time-display {
+      font-size: 0.85em; font-variant-numeric: tabular-nums;
+      color: var(--text-dim); min-width: 120px; flex-shrink: 0;
+    }
+
+    #timeline input[type="range"] {
+      flex: 1; height: 6px;
+      -webkit-appearance: none; appearance: none;
+      background: var(--accent); border-radius: 3px; outline: none;
+    }
+    #timeline input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--highlight); cursor: pointer;
+    }
+
+    .speed-select {
+      background: var(--accent); color: var(--text); border: none;
+      padding: 4px 8px; border-radius: 4px; font-size: 0.8em;
+      font-family: inherit; cursor: pointer;
+    }
+
+    /* === TOOLTIP === */
+    .point-info {
+      background: var(--panel-bg) !important;
+      border: 1px solid var(--accent) !important;
+      border-radius: 8px !important;
+      padding: 8px 12px !important;
+      font-size: 0.8em !important;
+      line-height: 1.6 !important;
+      color: var(--text) !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
+    }
+    .point-info .val { font-weight: 700; color: var(--highlight); }
+    .leaflet-popup-content-wrapper { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+    .leaflet-popup-tip { display: none !important; }
+    .leaflet-popup-close-button { color: var(--text-dim) !important; }
+
+    /* === EMPTY STATE === */
+    #empty-state {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center; z-index: 500; pointer-events: none;
+    }
+    #empty-state h2 { font-size: 1.6em; margin-bottom: 8px; font-weight: 300; }
+    #empty-state p { color: var(--text-dim); font-size: 0.95em; }
+
+    /* === RESPONSIVE === */
+    @media (max-width: 768px) {
+      #panel { display: none; }
+      #main { flex-direction: column; }
     }
   </style>
 </head>
 <body>
-  <div id="app">
-    <h1>Frankies Genius GPX Viewer</h1>
 
-    <input type="file" id="gpxInput" accept=".gpx" />
-    <p id="info">GPX-Datei auswählen oder per URL laden</p>
-
-    <div id="map"></div>
+  <div id="header">
+    <h1>Franks Sailing Tracker</h1>
+    <div class="controls">
+      <label class="btn" for="gpx-file">GPX laden</label>
+      <input type="file" id="gpx-file" accept=".gpx" />
+      <button class="btn" id="btn-fit" title="Auf Track zoomen">Fit</button>
+      <button class="btn" id="btn-clear" title="Track entfernen">Clear</button>
+    </div>
   </div>
 
-  <!-- Leaflet JS von CDN -->
+  <div id="main">
+    <div id="map">
+      <div id="empty-state">
+        <h2>GPX-Datei laden</h2>
+        <p>Lade eine Sailing-GPX-Datei um den Track zu analysieren</p>
+      </div>
+    </div>
+
+    <div id="panel">
+      <div class="panel-section">
+        <h3>Track Info</h3>
+        <div id="track-name" style="font-size:0.9em; margin-bottom:8px; color:var(--text-dim);">—</div>
+        <div class="stat-grid">
+          <div class="stat-box">
+            <div class="label">Distanz</div>
+            <div><span class="value" id="stat-dist">—</span><span class="unit">km</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Dauer</div>
+            <div><span class="value" id="stat-dur">—</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Max Speed</div>
+            <div><span class="value" id="stat-maxspd">—</span><span class="unit">kn</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Avg Speed</div>
+            <div><span class="value" id="stat-avgspd">—</span><span class="unit">kn</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Max Speed</div>
+            <div><span class="value" id="stat-maxspd-kmh">—</span><span class="unit">km/h</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Avg Speed</div>
+            <div><span class="value" id="stat-avgspd-kmh">—</span><span class="unit">km/h</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Punkte</div>
+            <div><span class="value" id="stat-points">—</span></div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Intervall</div>
+            <div><span class="value" id="stat-interval">—</span><span class="unit">s</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section" style="flex:1; min-height:120px;">
+        <h3>Speed-Profil</h3>
+        <canvas id="speed-chart"></canvas>
+        <div class="legend">
+          <span>0</span>
+          <div class="legend-bar"></div>
+          <span id="legend-max">kn</span>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Aktueller Punkt</h3>
+        <div id="current-point" style="font-size:0.85em; color:var(--text-dim);">
+          Bewege den Slider oder klicke auf den Track
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="timeline">
+    <button class="play-btn" id="btn-play">&#9654;</button>
+    <span class="time-display" id="time-display">00:00:00</span>
+    <input type="range" id="slider" min="0" max="1000" value="0" step="1" />
+    <select class="speed-select" id="playback-speed">
+      <option value="1">1x</option>
+      <option value="2">2x</option>
+      <option value="5" selected>5x</option>
+      <option value="10">10x</option>
+      <option value="20">20x</option>
+      <option value="50">50x</option>
+    </select>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-  <!-- leaflet-gpx von unpkg -->
-  <script src="https://unpkg.com/leaflet-gpx@2.2.0/gpx.js"></script>
-
   <script>
-    // Karte initialisieren
-    const map = L.map('map').setView([47.5, 13.5], 7);
+'use strict';
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
+// ============================================================
+// GPX PARSER
+// ============================================================
+function parseGPX(xmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'text/xml');
+  const nameEl = doc.querySelector('name');
+  const name = nameEl ? nameEl.textContent : 'Unnamed Track';
+  const trkpts = doc.querySelectorAll('trkpt');
+  const points = [];
 
-    // Aktuell geladene GPX-Layer merken (zum Entfernen)
-    let currentLayer = null;
+  trkpts.forEach(pt => {
+    const lat = parseFloat(pt.getAttribute('lat'));
+    const lon = parseFloat(pt.getAttribute('lon'));
+    const eleEl = pt.querySelector('ele');
+    const timeEl = pt.querySelector('time');
+    const speedEl = pt.querySelector('speed');
 
-    function clearCurrentLayer() {
-      if (currentLayer) {
-        map.removeLayer(currentLayer);
-        currentLayer = null;
-      }
+    points.push({
+      lat, lon,
+      ele: eleEl ? parseFloat(eleEl.textContent) : 0,
+      time: timeEl ? new Date(timeEl.textContent) : null,
+      gpsSpeed: speedEl ? parseFloat(speedEl.textContent) : null,
+      speed: 0, speedKn: 0, speedKmh: 0,
+      heading: 0, distance: 0, totalDist: 0,
+    });
+  });
+
+  return { name, points };
+}
+
+// ============================================================
+// TRACK ANALYTICS
+// ============================================================
+const R_EARTH = 6371000;
+const DEG = Math.PI / 180;
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const dLat = (lat2 - lat1) * DEG;
+  const dLon = (lon2 - lon1) * DEG;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*DEG)*Math.cos(lat2*DEG)*Math.sin(dLon/2)**2;
+  return R_EARTH * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calcBearing(lat1, lon1, lat2, lon2) {
+  const dLon = (lon2 - lon1) * DEG;
+  const y = Math.sin(dLon) * Math.cos(lat2 * DEG);
+  const x = Math.cos(lat1*DEG)*Math.sin(lat2*DEG) - Math.sin(lat1*DEG)*Math.cos(lat2*DEG)*Math.cos(dLon);
+  return ((Math.atan2(y, x) / DEG) + 360) % 360;
+}
+
+function analyzeTrack(points) {
+  let totalDist = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i-1], curr = points[i];
+    const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
+    curr.distance = dist;
+    totalDist += dist;
+    curr.totalDist = totalDist;
+
+    if (curr.gpsSpeed !== null && curr.gpsSpeed > 0) {
+      curr.speed = curr.gpsSpeed;
+    } else if (curr.time && prev.time) {
+      const dt = (curr.time - prev.time) / 1000;
+      curr.speed = dt > 0 ? dist / dt : 0;
     }
 
-    // GPX aus String laden (FileReader)
-    function loadGpxFromString(xmlText, filename) {
-      clearCurrentLayer();
-      document.getElementById('info').textContent = 'Lade ' + filename + ' …';
+    curr.speedKn = curr.speed * 1.94384;
+    curr.speedKmh = curr.speed * 3.6;
+    curr.heading = calcBearing(prev.lat, prev.lon, curr.lat, curr.lon);
+  }
 
-      currentLayer = new L.GPX(xmlText, {
-        async: true,
-        marker_options: {
-          startIconUrl: null,
-          endIconUrl: null,
-          shadowUrl: null,
-        },
-      })
-      .on('loaded', function (e) {
-        map.fitBounds(e.target.getBounds());
-        const dist = e.target.get_distance ? (e.target.get_distance() / 1000).toFixed(2) : null;
-        document.getElementById('info').textContent =
-          filename + (dist ? ' — ' + dist + ' km' : ' geladen');
-      })
-      .on('error', function () {
-        document.getElementById('info').textContent = 'Fehler beim Laden der GPX-Datei.';
-      })
-      .addTo(map);
-    }
+  if (points.length > 1) points[0].heading = points[1].heading;
 
-    // GPX von URL laden
-    function loadGpxFromUrl(url) {
-      clearCurrentLayer();
-      document.getElementById('info').textContent = 'Lade ' + url + ' …';
+  const speeds = points.map(p => p.speedKn);
+  const moving = speeds.filter(s => s > 0.5);
+  const duration = points.length > 1 && points[0].time && points[points.length-1].time
+    ? (points[points.length-1].time - points[0].time) / 1000 : 0;
+  const avgInt = points.length > 1 && duration > 0 ? duration / (points.length - 1) : 0;
 
-      currentLayer = new L.GPX(url, {
-        async: true,
-        marker_options: {
-          startIconUrl: null,
-          endIconUrl: null,
-          shadowUrl: null,
-        },
-      })
-      .on('loaded', function (e) {
-        map.fitBounds(e.target.getBounds());
-        const dist = e.target.get_distance ? (e.target.get_distance() / 1000).toFixed(2) : null;
-        document.getElementById('info').textContent =
-          url + (dist ? ' — ' + dist + ' km' : ' geladen');
-      })
-      .on('error', function () {
-        document.getElementById('info').textContent = 'Fehler beim Laden der GPX-Datei.';
-      })
-      .addTo(map);
-    }
+  return {
+    totalDist, duration,
+    maxSpeed: Math.max(...speeds),
+    avgSpeed: moving.length > 0 ? moving.reduce((a,b)=>a+b,0)/moving.length : 0,
+    pointCount: points.length,
+    avgInterval: Math.round(avgInt),
+  };
+}
 
-    // Datei-Upload
-    document.getElementById('gpxInput').addEventListener('change', function (e) {
-      const file = e.target.files[0];
-      if (!file) return;
+// ============================================================
+// SPEED → COLOR
+// ============================================================
+function speedColor(speed, maxSpeed) {
+  if (maxSpeed <= 0) return '#666';
+  const t = Math.min(speed / maxSpeed, 1);
+  const stops = [
+    [0.00, 49,54,149], [0.15, 69,117,180], [0.30, 116,173,209],
+    [0.45, 171,217,233], [0.55, 254,224,144], [0.70, 253,174,97],
+    [0.85, 244,109,67], [1.00, 215,48,39],
+  ];
+  let lo = stops[0], hi = stops[stops.length-1];
+  for (let i = 0; i < stops.length-1; i++) {
+    if (t >= stops[i][0] && t <= stops[i+1][0]) { lo = stops[i]; hi = stops[i+1]; break; }
+  }
+  const f = (hi[0]-lo[0]) > 0 ? (t-lo[0])/(hi[0]-lo[0]) : 0;
+  const r = Math.round(lo[1]+f*(hi[1]-lo[1]));
+  const g = Math.round(lo[2]+f*(hi[2]-lo[2]));
+  const b = Math.round(lo[3]+f*(hi[3]-lo[3]));
+  return `rgb(${r},${g},${b})`;
+}
 
-      const reader = new FileReader();
-      reader.onload = function (event) {
-        loadGpxFromString(event.target.result, file.name);
-      };
-      reader.readAsText(file);
+// ============================================================
+// MAP SETUP
+// ============================================================
+const map = L.map('map', { zoomControl: true, attributionControl: true }).setView([47.23, 8.80], 14);
+
+const tileLayers = {
+  'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; <a href="https://openstreetmap.org/copyright">OSM</a>'
+  }),
+  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19, attribution: '&copy; Esri'
+  }),
+  'Topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17, attribution: '&copy; OpenTopoMap'
+  }),
+};
+tileLayers['Satellite'].addTo(map);
+L.control.layers(tileLayers, null, { position: 'topright' }).addTo(map);
+
+// ============================================================
+// TRACK RENDERING
+// ============================================================
+let trackData = null, trackStats = null, trackLayers = [], boatMarker = null, trackBounds = null;
+
+const boatSVG = `<svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+  <polygon points="12,2 4,20 12,16 20,20" fill="#e94560" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>`;
+
+function createBoatIcon(heading) {
+  return L.divIcon({
+    html: `<div style="transform:rotate(${heading}deg);width:24px;height:24px;">${boatSVG}</div>`,
+    className: '', iconSize: [24,24], iconAnchor: [12,12],
+  });
+}
+
+function clearTrack() {
+  trackLayers.forEach(l => map.removeLayer(l));
+  trackLayers = [];
+  if (boatMarker) { map.removeLayer(boatMarker); boatMarker = null; }
+  trackData = null; trackStats = null; trackBounds = null;
+  stopPlayback();
+  updateStatsPanel();
+  document.getElementById('empty-state').style.display = 'block';
+}
+
+function renderTrack(data) {
+  clearTrack();
+  document.getElementById('empty-state').style.display = 'none';
+  trackData = data;
+  trackStats = analyzeTrack(data.points);
+  updateStatsPanel();
+  drawSpeedChart();
+
+  const maxSpd = trackStats.maxSpeed;
+  const pts = data.points;
+
+  // Color-coded segments
+  for (let i = 1; i < pts.length; i++) {
+    const color = speedColor(pts[i].speedKn, maxSpd);
+    const seg = L.polyline(
+      [[pts[i-1].lat, pts[i-1].lon], [pts[i].lat, pts[i].lon]],
+      { color, weight: 4, opacity: 0.9 }
+    );
+
+    seg.on('mouseover', function(e) {
+      const info = `<div class="point-info">
+        <b>Speed:</b> <span class="val">${pts[i].speedKn.toFixed(1)} kn</span> (${pts[i].speedKmh.toFixed(1)} km/h)<br>
+        <b>Heading:</b> <span class="val">${pts[i].heading.toFixed(0)}°</span><br>
+        <b>Dist:</b> <span class="val">${(pts[i].totalDist/1000).toFixed(2)} km</span><br>
+        ${pts[i].time ? `<b>Zeit:</b> ${pts[i].time.toLocaleTimeString('de-CH')}` : ''}
+      </div>`;
+      L.popup().setLatLng(e.latlng).setContent(info).openOn(map);
     });
 
-    // Auto-load Beispiel-Track (wenn auf dem Server vorhanden)
-    // loadGpxFromUrl('/tracks/sample1.gpx');
+    seg.on('click', () => goToPoint(i));
+    seg.addTo(map);
+    trackLayers.push(seg);
+  }
+
+  // Start/End markers
+  const startM = L.circleMarker([pts[0].lat, pts[0].lon], {
+    radius: 8, color: '#00ff88', fillColor: '#00ff88', fillOpacity: 0.9, weight: 2
+  }).bindTooltip('Start', { permanent: true, direction: 'top', className: 'point-info' });
+  startM.addTo(map); trackLayers.push(startM);
+
+  const endM = L.circleMarker([pts[pts.length-1].lat, pts[pts.length-1].lon], {
+    radius: 8, color: '#e94560', fillColor: '#e94560', fillOpacity: 0.9, weight: 2
+  }).bindTooltip('Finish', { permanent: true, direction: 'top', className: 'point-info' });
+  endM.addTo(map); trackLayers.push(endM);
+
+  // Boat marker
+  boatMarker = L.marker([pts[0].lat, pts[0].lon], {
+    icon: createBoatIcon(pts[0].heading), zIndexOffset: 1000
+  }).addTo(map);
+  trackLayers.push(boatMarker);
+
+  // Fit bounds
+  trackBounds = L.latLngBounds(pts.map(p => [p.lat, p.lon]));
+  map.fitBounds(trackBounds, { padding: [30, 30] });
+
+  // Setup slider
+  const slider = document.getElementById('slider');
+  slider.max = pts.length - 1;
+  slider.value = 0;
+  goToPoint(0);
+}
+
+// ============================================================
+// STATS PANEL
+// ============================================================
+function updateStatsPanel() {
+  const ids = ['track-name','stat-dist','stat-dur','stat-maxspd','stat-avgspd',
+               'stat-maxspd-kmh','stat-avgspd-kmh','stat-points','stat-interval'];
+  if (!trackData || !trackStats) {
+    ids.forEach(id => document.getElementById(id).textContent = '—');
+    return;
+  }
+  const s = trackStats;
+  document.getElementById('track-name').textContent = trackData.name;
+  document.getElementById('stat-dist').textContent = (s.totalDist/1000).toFixed(2);
+  document.getElementById('stat-dur').textContent = formatDuration(s.duration);
+  document.getElementById('stat-maxspd').textContent = s.maxSpeed.toFixed(1);
+  document.getElementById('stat-avgspd').textContent = s.avgSpeed.toFixed(1);
+  document.getElementById('stat-maxspd-kmh').textContent = (s.maxSpeed / 1.94384 * 3.6).toFixed(1);
+  document.getElementById('stat-avgspd-kmh').textContent = (s.avgSpeed / 1.94384 * 3.6).toFixed(1);
+  document.getElementById('stat-points').textContent = s.pointCount;
+  document.getElementById('stat-interval').textContent = s.avgInterval;
+  document.getElementById('legend-max').textContent = s.maxSpeed.toFixed(1) + ' kn';
+}
+
+function formatDuration(secs) {
+  const h = Math.floor(secs/3600);
+  const m = Math.floor((secs%3600)/60);
+  const s = Math.floor(secs%60);
+  return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// ============================================================
+// SPEED CHART
+// ============================================================
+function drawSpeedChart() {
+  const canvas = document.getElementById('speed-chart');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width - 32;
+  canvas.height = 100;
+
+  if (!trackData || !trackStats) { ctx.clearRect(0,0,canvas.width,canvas.height); return; }
+
+  const pts = trackData.points;
+  const maxSpd = trackStats.maxSpeed;
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const barW = Math.max(1, w / pts.length);
+  for (let i = 0; i < pts.length; i++) {
+    const spd = pts[i].speedKn;
+    const barH = maxSpd > 0 ? (spd / maxSpd) * (h - 4) : 0;
+    ctx.fillStyle = speedColor(spd, maxSpd);
+    ctx.fillRect((i/pts.length)*w, h - barH, barW + 0.5, barH);
+  }
+
+  canvas.onclick = function(e) {
+    const idx = Math.floor((e.offsetX / w) * pts.length);
+    if (idx >= 0 && idx < pts.length) goToPoint(idx);
+  };
+}
+
+// ============================================================
+// PLAYBACK
+// ============================================================
+let isPlaying = false, playbackTimer = null, currentIndex = 0;
+let lastFrameTime = 0;
+
+function goToPoint(idx) {
+  if (!trackData) return;
+  const pts = trackData.points;
+  idx = Math.max(0, Math.min(idx, pts.length - 1));
+  currentIndex = idx;
+  const pt = pts[idx];
+
+  if (boatMarker) {
+    boatMarker.setLatLng([pt.lat, pt.lon]);
+    boatMarker.setIcon(createBoatIcon(pt.heading));
+  }
+
+  document.getElementById('slider').value = idx;
+  if (pt.time) document.getElementById('time-display').textContent = pt.time.toLocaleTimeString('de-CH');
+
+  document.getElementById('current-point').innerHTML = `
+    <b>${pt.speedKn.toFixed(1)}</b> kn &nbsp;|&nbsp;
+    <b>${pt.speedKmh.toFixed(1)}</b> km/h &nbsp;|&nbsp;
+    ${pt.heading.toFixed(0)}° &nbsp;|&nbsp;
+    ${(pt.totalDist/1000).toFixed(2)} km
+  `;
+
+  highlightChartPos(idx);
+}
+
+function highlightChartPos(idx) {
+  const canvas = document.getElementById('speed-chart');
+  const ctx = canvas.getContext('2d');
+  if (!trackData) return;
+  drawSpeedChart();
+  const x = (idx / trackData.points.length) * canvas.width;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, 0);
+  ctx.lineTo(x, canvas.height);
+  ctx.stroke();
+}
+
+function togglePlayback() { isPlaying ? stopPlayback() : startPlayback(); }
+
+function startPlayback() {
+  if (!trackData) return;
+  isPlaying = true;
+  document.getElementById('btn-play').innerHTML = '&#9646;&#9646;';
+  lastFrameTime = performance.now();
+
+  function tick(now) {
+    if (!isPlaying || !trackData) return;
+    const delta = (now - lastFrameTime) / 1000; // seconds since last frame
+    lastFrameTime = now;
+
+    const speed = parseInt(document.getElementById('playback-speed').value);
+    const pts = trackData.points;
+
+    // Time-based: advance by real-time * multiplier
+    if (pts[currentIndex] && pts[currentIndex].time && currentIndex < pts.length - 1) {
+      const interval = pts[currentIndex + 1] && pts[currentIndex + 1].time
+        ? (pts[currentIndex + 1].time - pts[currentIndex].time) / 1000
+        : trackStats.avgInterval;
+      const advance = (delta * speed) / Math.max(interval, 0.1);
+      currentIndex += Math.max(1, Math.round(advance));
+    } else {
+      currentIndex += speed;
+    }
+
+    if (currentIndex >= pts.length) {
+      currentIndex = 0;
+    }
+
+    goToPoint(currentIndex);
+    playbackTimer = requestAnimationFrame(tick);
+  }
+
+  playbackTimer = requestAnimationFrame(tick);
+}
+
+function stopPlayback() {
+  isPlaying = false;
+  document.getElementById('btn-play').innerHTML = '&#9654;';
+  if (playbackTimer) { cancelAnimationFrame(playbackTimer); playbackTimer = null; }
+}
+
+// ============================================================
+// EVENT HANDLERS
+// ============================================================
+document.getElementById('gpx-file').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const data = parseGPX(ev.target.result);
+    if (data.points.length === 0) { alert('Keine Trackpoints gefunden.'); return; }
+    renderTrack(data);
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+document.getElementById('btn-fit').addEventListener('click', () => {
+  if (trackBounds) map.fitBounds(trackBounds, { padding: [30,30] });
+});
+
+document.getElementById('btn-clear').addEventListener('click', clearTrack);
+document.getElementById('btn-play').addEventListener('click', togglePlayback);
+
+document.getElementById('slider').addEventListener('input', function(e) {
+  stopPlayback();
+  goToPoint(parseInt(e.target.value));
+});
+
+window.addEventListener('keydown', function(e) {
+  if (e.code === 'Space') { e.preventDefault(); togglePlayback(); }
+  if (e.code === 'ArrowRight') { stopPlayback(); goToPoint(currentIndex + 1); }
+  if (e.code === 'ArrowLeft') { stopPlayback(); goToPoint(currentIndex - 1); }
+});
+
+window.addEventListener('resize', () => { if (trackData) drawSpeedChart(); });
+
+// Drag & Drop
+document.body.addEventListener('dragover', e => e.preventDefault());
+document.body.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.toLowerCase().endsWith('.gpx')) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const data = parseGPX(ev.target.result);
+      if (data.points.length > 0) renderTrack(data);
+    };
+    reader.readAsText(file);
+  }
+});
   </script>
 </body>
 </html>
