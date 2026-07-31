@@ -1686,40 +1686,41 @@ async function listStorageTracks() {
       let name = o.name.substring(HAZU_STORAGE_PREFIX.length);
       // Hazu hängt einen Timestamp an: "Track_1785513300466.gpx" -> "Track.gpx"
       name = name.replace(/_\d{13}(\.gpx)$/i, '$1');
-      return { url: dl, name };
+      const when = o.updated || o.timeCreated || '';
+      const day = when ? when.slice(0, 10) : '';
+      return { url: dl, name: day ? `${name}  (${day})` : name, sortKey: when };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    // Neueste Uploads zuerst — sonst versteckt sich eine frische Datei unten
+    .sort((a, b) => String(b.sortKey).localeCompare(String(a.sortKey)));
 }
 
-// Bekannte Tracks als verlässlicher Fallback, falls keine API erreichbar ist.
-const HAZU_KNOWN_TRACKS = [
-  {
-    name: 'Stäfa–Rappi 2025-06-15',
-    url: 'https://firebasestorage.googleapis.com/v0/b/hazu-ch.appspot.com/o/'
-       + 'files%2FhGkK2s8ofQXWdaeKuP0nlRm1IRu2%2FSta%CC%88fa%20Rappi%20SailFreeGps_2025-06-15_01-42-45_1785513300466.gpx'
-       + '?alt=media&token=c5b296fb-00a9-4626-b461-3ae8bb9253ad',
-  },
-  {
-    name: 'Track 1 — Stäfa–Rappi 2025-06-15',
-    url: 'https://firebasestorage.googleapis.com/v0/b/hazu-ch.appspot.com/o/'
-       + 'files%2FhGkK2s8ofQXWdaeKuP0nlRm1IRu2%2FSta%CC%88fa%20Rappi%20SailFreeGps_2025-06-15_01-42-45_1785512757827.gpx'
-       + '?alt=media&token=7b9f1cbb-6b8b-4bc9-997c-61cb6128cfdf',
-  },
-];
+// Kuratiertes Manifest neben der HTML-Datei. Das ist die Quelle der Wahrheit:
+// es wird aus dem Hazu erzeugt und enthält nur wirklich verlinkte Tracks.
+// WICHTIG: keine im Code hartcodierte Track-Liste — die zeigt sonst für immer
+// Tracks an, die im Hazu längst gelöscht sind.
+async function listManifestTracks() {
+  const text = await fetchWithFallback('tracks.json');
+  const data = JSON.parse(text);
+  if (!Array.isArray(data.tracks) || data.tracks.length === 0) {
+    throw new Error('tracks.json enthält keine Tracks');
+  }
+  return data.tracks.map(t => ({ url: t.url, name: t.name }));
+}
 
 // Liest einen Hazu und extrahiert alle GPX-Datei-Links
 async function listHazuTracks(hazuId) {
   const tried = [];
 
-  // 1. Storage-Ordner direkt auflisten — findet auch neu hochgeladene Dateien
+  // 1. Kuratiertes Manifest (tracks.json) — genau die im Hazu verlinkten Tracks
   try {
-    const st = await listStorageTracks();
-    if (st.length > 0) { console.info('Hazu tracks via Storage listing'); return st; }
-    tried.push('Storage-Listing → 0 GPX');
+    const mf = await listManifestTracks();
+    console.info('Hazu tracks via tracks.json');
+    return mf;
   } catch (e) {
-    tried.push('Storage-Listing → ' + e.message);
+    tried.push('tracks.json → ' + e.message);
   }
 
+  // 2. Hazu/Firebase-APIs
   for (const url of hazuCandidateEndpoints(hazuId)) {
     try {
       const text = await fetchWithFallback(url);
@@ -1733,14 +1734,22 @@ async function listHazuTracks(hazuId) {
       tried.push(url.split('?')[0] + ' → ' + e.message);
     }
   }
-  console.warn('Hazu endpoints tried:\n' + tried.join('\n'));
 
-  // Letzter Fallback: eingebaute Liste
-  if (HAZU_KNOWN_TRACKS.length > 0) {
-    console.info('Falling back to built-in track list');
-    return HAZU_KNOWN_TRACKS.slice();
+  // 3. Storage-Ordner. ACHTUNG: listet ALLE je hochgeladenen Dateien, auch
+  //    solche, deren Hazu-Item gelöscht wurde (Storage-Objekt bleibt liegen).
+  try {
+    const st = await listStorageTracks();
+    if (st.length > 0) {
+      console.info('Hazu tracks via Storage listing (enthält evtl. Altlasten)');
+      st.storageFallback = true;
+      return st;
+    }
+    tried.push('Storage-Listing → 0 GPX');
+  } catch (e) {
+    tried.push('Storage-Listing → ' + e.message);
   }
 
+  console.warn('Hazu endpoints tried:\n' + tried.join('\n'));
   const err = new Error('kein Endpoint lieferte GPX-Links');
   err.tried = tried;
   throw err;
@@ -1810,7 +1819,8 @@ document.getElementById('btn-hazu-list').addEventListener('click', async functio
       tracks.map(t => `<option value="${t.url.replace(/"/g,'&quot;')}">${t.name}</option>`).join('');
     sel.selectedIndex = 0;
     sel.style.display = 'block';
-    hazuStatus(tracks.length + ' Track(s) gefunden');
+    hazuStatus(tracks.length + ' Track(s) gefunden'
+      + (tracks.storageFallback ? ' (Storage-Ordner — evtl. gelöschte dabei)' : ''));
   } catch (e) {
     sel.style.display = 'none';
     hazuStatus('Keine Tracks gefunden — bitte GPX-URL direkt einfügen', true);

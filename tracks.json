@@ -1,0 +1,17 @@
+{
+  "_comment": "Track-Manifest, generiert aus dem Hazu 'GPX Tracks' (e3BO8dZV0I2pLMAYwzIv). Quelle der Wahrheit fuer die Track-Liste im Viewer.",
+  "hazuId": "e3BO8dZV0I2pLMAYwzIv",
+  "generated": "2026-07-31",
+  "tracks": [
+    {
+      "name": "Distanzfahrt Herrliberg — 2025-07-12 (Thomas)",
+      "hazuKey": "7iEU38F6qPkQ7VZX59VL",
+      "url": "https://firebasestorage.googleapis.com/v0/b/hazu-ch.appspot.com/o/files%2FhGkK2s8ofQXWdaeKuP0nlRm1IRu2%2FDistanzfahrt-Herrliberg-SailFreeGps_2025-07-12_18-33-51_1785515222502.gpx?alt=media&token=970ac9d0-af05-4fbf-8dec-e5d1d51f1541"
+    },
+    {
+      "name": "Pfingstregatta — 2025-06-07 (Frank)",
+      "hazuKey": "T8fFaFf8n3WWfktSiVPf",
+      "url": "https://firebasestorage.googleapis.com/v0/b/hazu-ch.appspot.com/o/files%2FhGkK2s8ofQXWdaeKuP0nlRm1IRu2%2FPfingstregatta%20SailFreeGps_2025-06-07_18-54-10_1785517179840.gpx?alt=media&token=538ae66d-bbed-4491-8ce1-61ea0f00e568"
+    }
+  ]
+}
