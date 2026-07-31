@@ -1633,30 +1633,45 @@ function bustCache(url) {
 // _cb plus cache:'no-store' (eine fetch-Option, kein Header) genügen völlig.
 const NO_CACHE = { cache: 'no-store', mode: 'cors', credentials: 'omit' };
 
-async function fetchWithFallback(url, opts) {
-  const fresh = (opts && opts.allowCache) ? url : bustCache(url);
-  const init = (opts && opts.allowCache) ? {} : NO_CACHE;
-  const errs = [];
+// Jede Anfrage bekommt ein hartes Zeitlimit. Ohne das hängt ein einziger
+// blockierter Endpoint die ganze Kette auf und es sieht aus wie "lädt nicht".
+async function fetchText(url, init, timeoutMs) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs || 6000);
   try {
-    const r = await fetch(fresh, init);
+    const r = await fetch(url, Object.assign({ signal: ctrl.signal }, init || {}));
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return await r.text();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// opts.allowCache : kein Cache-Buster (für GPX mit eindeutigem Dateinamen)
+// opts.noProxy    : keine Proxy-Versuche (für spekulative Endpoint-Suche)
+// opts.timeout    : Zeitlimit pro Versuch in ms
+async function fetchWithFallback(url, opts) {
+  opts = opts || {};
+  const fresh = opts.allowCache ? url : bustCache(url);
+  const init = opts.allowCache ? {} : NO_CACHE;
+  const errs = [];
+  try {
+    return await fetchText(fresh, init, opts.timeout);
   } catch (e) {
     // "Failed to fetch" = fast immer CORS, nicht "Datei fehlt"
-    errs.push('direkt: ' + e.message);
+    errs.push('direkt: ' + (e.name === 'AbortError' ? 'Timeout' : e.message));
   }
   // Relative URLs kann ein CORS-Proxy nicht auflösen — nicht weiterversuchen.
-  if (!/^https?:\/\//i.test(url)) throw new Error(errs.join(' | '));
+  if (opts.noProxy || !/^https?:\/\//i.test(url)) throw new Error(errs.join(' | '));
 
   for (const mk of CORS_PROXIES) {
     try {
-      const r = await fetch(mk(fresh), { cache: 'no-store' });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const txt = await r.text();
+      const txt = await fetchText(mk(fresh), { cache: 'no-store' }, opts.timeout);
       if (txt && txt.length > 0) return txt;
       throw new Error('leere Antwort');
     } catch (e) {
-      errs.push(mk('').split('?')[0].replace(/^https?:\/\//, '') + ': ' + e.message);
+      errs.push(mk('x').split('?')[0].replace(/^https?:\/\//, '').replace(/\/x$/, '')
+        + ': ' + (e.name === 'AbortError' ? 'Timeout' : e.message));
     }
   }
   throw new Error(errs.join(' | '));
@@ -1691,10 +1706,10 @@ function hazuCandidateEndpoints(id) {
 const HAZU_STORAGE_BUCKET = 'hazu-ch.appspot.com';
 const HAZU_STORAGE_PREFIX = 'files/hGkK2s8ofQXWdaeKuP0nlRm1IRu2/';
 
-async function listStorageTracks() {
+async function listStorageTracks(opts) {
   const url = `https://firebasestorage.googleapis.com/v0/b/${HAZU_STORAGE_BUCKET}/o?prefix=`
     + encodeURIComponent(HAZU_STORAGE_PREFIX) + '&maxResults=1000';
-  const text = await fetchWithFallback(url);
+  const text = await fetchWithFallback(url, opts);
   const data = JSON.parse(text);
   if (!data.items) throw new Error('keine items in Storage-Antwort');
   return data.items
@@ -1786,25 +1801,28 @@ async function listHazuTracks(hazuId) {
     tried.push('tracks.json → ' + e.message);
   }
 
-  // 2. Hazu/Firebase-APIs
-  for (const url of hazuCandidateEndpoints(hazuId)) {
-    try {
-      const text = await fetchWithFallback(url);
-      const tracks = extractGpxLinks(text);
-      if (tracks.length > 0) {
-        console.info('Hazu tracks via', url);
-        return tracks;
-      }
-      tried.push(url.split('?')[0] + ' → 0 Treffer');
-    } catch (e) {
-      tried.push(url.split('?')[0] + ' → ' + e.message);
-    }
-  }
+  // 2. Hazu/Firebase-APIs — parallel und OHNE Proxy-Kette. Sequenziell mit je
+  //    4 Proxy-Versuchen wären das ~45 Requests; das dauerte Minuten und sah
+  //    aus als würde die Seite nichts laden.
+  const probes = hazuCandidateEndpoints(hazuId).map(url =>
+    fetchWithFallback(url, { noProxy: true, timeout: 5000 })
+      .then(text => {
+        const tracks = extractGpxLinks(text);
+        if (tracks.length === 0) throw new Error('0 Treffer');
+        return { url, tracks };
+      })
+      .catch(e => { tried.push(url.split('?')[0] + ' → ' + e.message); throw e; })
+  );
+  try {
+    const hit = await Promise.any(probes);
+    console.info('Hazu tracks via', hit.url);
+    return hit.tracks;
+  } catch (e) { /* alle Endpoints gescheitert, weiter mit Schritt 3 */ }
 
   // 3. Storage-Ordner. ACHTUNG: listet ALLE je hochgeladenen Dateien, auch
   //    solche, deren Hazu-Item gelöscht wurde (Storage-Objekt bleibt liegen).
   try {
-    const st = await listStorageTracks();
+    const st = await listStorageTracks({ timeout: 6000 });
     if (st.length > 0) {
       console.info('Hazu tracks via Storage listing (enthält evtl. Altlasten)');
       st.storageFallback = true;
