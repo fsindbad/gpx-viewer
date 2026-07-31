@@ -1,0 +1,7 @@
+# Cloudflare Pages: Header-Regeln
+# tracks.json muss cross-origin lesbar sein, damit der Viewer das Manifest auch
+# dann laden kann, wenn die HTML nicht von amberella.digital läuft (z.B. als
+# Hazu-Upload aus Firebase Storage).
+/tracks.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: no-cache, must-revalidate

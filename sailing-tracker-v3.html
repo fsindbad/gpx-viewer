@@ -1726,6 +1726,12 @@ const MANIFEST_URLS = [
   'https://amberella.digital/tracks.json',
 ];
 
+// ?manifest=<url> erlaubt es, ein beliebiges Manifest anzugeben
+(function addManifestParam() {
+  const m = new URLSearchParams(window.location.search).get('manifest');
+  if (m) MANIFEST_URLS.unshift(m);
+})();
+
 async function listManifestTracks() {
   let lastErr = null;
   for (const u of MANIFEST_URLS) {
