@@ -1629,15 +1629,22 @@ const NO_CACHE = {
 async function fetchWithFallback(url, opts) {
   const fresh = (opts && opts.allowCache) ? url : bustCache(url);
   const init = (opts && opts.allowCache) ? {} : NO_CACHE;
+  let firstErr = null;
   try {
     const r = await fetch(fresh, init);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return await r.text();
   } catch (e) {
-    // CORS oder Netzwerkfehler → Proxy versuchen (ebenfalls cache-busted)
+    firstErr = e;
+  }
+  // Relative URLs kann ein CORS-Proxy nicht auflösen — nicht weiterversuchen.
+  if (!/^https?:\/\//i.test(url)) throw firstErr;
+  try {
     const r2 = await fetch(bustCache(CORS_PROXY + encodeURIComponent(fresh)), NO_CACHE);
     if (!r2.ok) throw new Error('HTTP ' + r2.status + ' (auch via Proxy)');
     return await r2.text();
+  } catch (e2) {
+    throw new Error(firstErr.message + ' / Proxy: ' + e2.message);
   }
 }
 
@@ -1698,14 +1705,53 @@ async function listStorageTracks() {
 // es wird aus dem Hazu erzeugt und enthält nur wirklich verlinkte Tracks.
 // WICHTIG: keine im Code hartcodierte Track-Liste — die zeigt sonst für immer
 // Tracks an, die im Hazu längst gelöscht sind.
+// Die HTML läuft je nach Situation von Cloudflare, aus Firebase Storage
+// (Hazu-Upload) oder von file:// — deshalb mehrere Orte für das Manifest.
+const MANIFEST_URLS = [
+  'tracks.json',
+  'https://amberella.digital/tracks.json',
+];
+
 async function listManifestTracks() {
-  const text = await fetchWithFallback('tracks.json');
-  const data = JSON.parse(text);
-  if (!Array.isArray(data.tracks) || data.tracks.length === 0) {
-    throw new Error('tracks.json enthält keine Tracks');
+  let lastErr = null;
+  for (const u of MANIFEST_URLS) {
+    try {
+      const text = await fetchWithFallback(u);
+      const data = JSON.parse(text);
+      if (!Array.isArray(data.tracks) || data.tracks.length === 0) {
+        throw new Error('enthält keine Tracks');
+      }
+      console.info('Manifest geladen von', u, '(Stand ' + (data.generated || '?') + ')');
+      const list = data.tracks.map(t => ({ url: t.url, name: t.name }));
+      list.manifestDate = data.generated || null;
+      return list;
+    } catch (e) {
+      lastErr = new Error(u + ': ' + e.message);
+    }
   }
-  return data.tracks.map(t => ({ url: t.url, name: t.name }));
+  throw lastErr || new Error('kein Manifest erreichbar');
 }
+
+// Eingebauter Schnappschuss als letzte Rettung, wenn weder Manifest noch API
+// erreichbar sind (z.B. HTML direkt aus Hazu geöffnet, ohne tracks.json daneben).
+// Stand identisch mit tracks.json — beim Aktualisieren BEIDE anpassen.
+const EMBEDDED_MANIFEST = {
+  generated: '2026-07-31',
+  tracks: [
+    {
+      name: 'Distanzfahrt Herrliberg — 2025-07-12 (Thomas)',
+      url: 'https://firebasestorage.googleapis.com/v0/b/hazu-ch.appspot.com/o/'
+         + 'files%2FhGkK2s8ofQXWdaeKuP0nlRm1IRu2%2FDistanzfahrt-Herrliberg-SailFreeGps_2025-07-12_18-33-51_1785515222502.gpx'
+         + '?alt=media&token=970ac9d0-af05-4fbf-8dec-e5d1d51f1541',
+    },
+    {
+      name: 'Pfingstregatta — 2025-06-07 (Frank)',
+      url: 'https://firebasestorage.googleapis.com/v0/b/hazu-ch.appspot.com/o/'
+         + 'files%2FhGkK2s8ofQXWdaeKuP0nlRm1IRu2%2FPfingstregatta%20SailFreeGps_2025-06-07_18-54-10_1785517179840.gpx'
+         + '?alt=media&token=538ae66d-bbed-4491-8ce1-61ea0f00e568',
+    },
+  ],
+};
 
 // Liest einen Hazu und extrahiert alle GPX-Datei-Links
 async function listHazuTracks(hazuId) {
@@ -1747,6 +1793,16 @@ async function listHazuTracks(hazuId) {
     tried.push('Storage-Listing → 0 GPX');
   } catch (e) {
     tried.push('Storage-Listing → ' + e.message);
+  }
+
+  // 4. Eingebauter Schnappschuss
+  if (EMBEDDED_MANIFEST.tracks.length > 0) {
+    console.warn('Hazu endpoints tried:\n' + tried.join('\n'));
+    console.info('Nutze eingebauten Schnappschuss vom ' + EMBEDDED_MANIFEST.generated);
+    const list = EMBEDDED_MANIFEST.tracks.map(t => ({ url: t.url, name: t.name }));
+    list.embedded = true;
+    list.manifestDate = EMBEDDED_MANIFEST.generated;
+    return list;
   }
 
   console.warn('Hazu endpoints tried:\n' + tried.join('\n'));
@@ -1819,12 +1875,15 @@ document.getElementById('btn-hazu-list').addEventListener('click', async functio
       tracks.map(t => `<option value="${t.url.replace(/"/g,'&quot;')}">${t.name}</option>`).join('');
     sel.selectedIndex = 0;
     sel.style.display = 'block';
-    hazuStatus(tracks.length + ' Track(s) gefunden'
-      + (tracks.storageFallback ? ' (Storage-Ordner — evtl. gelöschte dabei)' : ''));
+    let src = '';
+    if (tracks.storageFallback) src = ' (Storage-Ordner — evtl. gelöschte dabei)';
+    else if (tracks.embedded) src = ' (eingebauter Stand ' + tracks.manifestDate + ')';
+    else if (tracks.manifestDate) src = ' (Stand ' + tracks.manifestDate + ')';
+    hazuStatus(tracks.length + ' Track(s) gefunden' + src);
   } catch (e) {
     sel.style.display = 'none';
-    hazuStatus('Keine Tracks gefunden — bitte GPX-URL direkt einfügen', true);
-    console.warn('Hazu listing failed:', e);
+    hazuStatus('Keine Tracks gefunden: ' + e.message + ' — Details in der Konsole', true);
+    console.warn('Hazu listing failed:', e, e.tried || '');
   } finally {
     this.disabled = false;
   }
