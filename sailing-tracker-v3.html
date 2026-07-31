@@ -604,13 +604,40 @@ function lerpAngle(a, b, t) {
 // ============================================================
 // BOAT / BUOY / TARGET ICONS (SVG)
 // ============================================================
-const boatSVGMarkup = `<svg viewBox="0 0 40 50" width="40" height="50" xmlns="http://www.w3.org/2000/svg">
-  <path d="M8,38 Q12,46 20,48 Q28,46 32,38 L30,36 L10,36 Z" fill="#4a3728" stroke="#2a1f14" stroke-width="0.8"/>
-  <path d="M20,6 L20,36 L32,32 Q28,18 20,6 Z" fill="rgba(255,255,255,0.9)" stroke="#ccc" stroke-width="0.5"/>
-  <path d="M20,10 L20,30 L10,28 Q14,18 20,10 Z" fill="rgba(240,240,255,0.85)" stroke="#ccc" stroke-width="0.5"/>
-  <line x1="20" y1="4" x2="20" y2="38" stroke="#333" stroke-width="1.2"/>
-  <circle cx="20" cy="4" r="1.2" fill="#e94560"/>
+// Schlichter Pfeil in Bootsform: spitzer Bug, konkaves Heck.
+// Zeigt nach oben (0° = Norden), wird per CSS/Cesium mit dem Heading rotiert.
+const boatSVGMarkup = `<svg viewBox="0 0 32 32" width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+  <path d="M16,2 L27,28 Q16,23 5,28 Z" fill="#e94560" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"/>
+  <line x1="16" y1="7" x2="16" y2="24" stroke="#ffffff" stroke-width="1.1" opacity="0.75"/>
 </svg>`;
+
+// Cesium kann SVG-Data-URIs unzuverlässig als WebGL-Textur laden.
+// Darum zeichnen wir das Boot auf ein Canvas — das funktioniert immer.
+function makeBoatCanvas(size) {
+  const s = size || 64;
+  const c = document.createElement('canvas');
+  c.width = s; c.height = s;
+  const g = c.getContext('2d');
+  const k = s / 32;
+  g.beginPath();
+  g.moveTo(16*k, 2*k);
+  g.lineTo(27*k, 28*k);
+  g.quadraticCurveTo(16*k, 23*k, 5*k, 28*k);
+  g.closePath();
+  g.fillStyle = '#e94560';
+  g.fill();
+  g.lineWidth = 2.2 * k;
+  g.strokeStyle = '#ffffff';
+  g.lineJoin = 'round';
+  g.stroke();
+  g.beginPath();
+  g.moveTo(16*k, 7*k);
+  g.lineTo(16*k, 24*k);
+  g.lineWidth = 1.4 * k;
+  g.strokeStyle = 'rgba(255,255,255,0.8)';
+  g.stroke();
+  return c;
+}
 
 const buoySVGMarkup = `<svg viewBox="0 0 28 34" width="28" height="34" xmlns="http://www.w3.org/2000/svg">
   <polygon points="14,0 20,10 8,10" fill="#ffa500" stroke="#cc8400" stroke-width="0.6"/>
@@ -623,13 +650,13 @@ function svgToDataUri(svgStr) {
 }
 
 const targetIconDataUri = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI4IiBzdHJva2U9IiNmZmE1MDAiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPjxwb2x5Z29uIHBvaW50cz0iMTIsMCAxNiw4IDI0LDEyIDE2LDE2IDEyLDI0IDgsIDE2IDAsIDEyIDgsOCIgZmlsbD0iI2ZmYTUwMCIvPjwvc3ZnPg==';
-const boatDataUri3D = svgToDataUri(boatSVGMarkup);
+const boatCanvas3D = makeBoatCanvas(64);
 const buoyDataUri3D = svgToDataUri(buoySVGMarkup);
 
 function createBoatIcon(heading) {
   return L.divIcon({
-    html: `<div style="transform:rotate(${heading}deg);transform-origin:20px 48px;width:40px;height:50px;">${boatSVGMarkup}</div>`,
-    className: '', iconSize: [40,50], iconAnchor: [20,48],
+    html: `<div style="transform:rotate(${heading}deg);transform-origin:16px 16px;width:32px;height:32px;">${boatSVGMarkup}</div>`,
+    className: '', iconSize: [32,32], iconAnchor: [16,16],
   });
 }
 
@@ -664,13 +691,21 @@ L.control.layers(tileLayers, null, { position: 'topright' }).addTo(leafletMap);
 let cesiumViewer = null;
 let cesiumReady = false;
 
+// Esri World Imagery — dieselben Tiles wie in der 2D-Satellitenansicht.
+// Kein Ion-Token nötig, dadurch keine schwarze Kugel wenn das Token abläuft.
+function makeEsriImagery() {
+  return new Cesium.UrlTemplateImageryProvider({
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    credit: 'Esri, Maxar, Earthstar Geographics',
+    maximumLevel: 19,
+  });
+}
+
 function initCesium() {
   if (cesiumReady) return;
 
-  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxMjhkMjgyYy1hY2UxLTQ5ODMtODRlNi04NGNkYWVjNDA1NTgiLCJpZCI6NDE3MTY3LCJpYXQiOjE3NzYwMDg4MTZ9.3Ug9RQFqg6DAmN2LWVAVnmH-YHH7OIDS_9U2tRDnJsw';
-
   try {
-    cesiumViewer = new Cesium.Viewer('globe-3d', {
+    const opts = {
       animation: false,
       timeline: false,
       fullscreenButton: false,
@@ -682,16 +717,40 @@ function initCesium() {
       infoBox: false,
       selectionIndicator: false,
       creditContainer: document.createElement('div'),
-    });
+      // Flaches Ellipsoid statt World Terrain — Wasser ist ohnehin flach,
+      // und es braucht kein Ion-Token.
+      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+    };
 
-    cesiumViewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0a2e');
+    // Cesium >= 1.104 nutzt `baseLayer`; `imageryProvider` wird ignoriert.
+    // Ohne explizites baseLayer fällt Cesium auf Ion zurück -> schwarze Kugel.
+    if (Cesium.ImageryLayer && Cesium.ImageryLayer.fromProviderAsync) {
+      opts.baseLayer = Cesium.ImageryLayer.fromProviderAsync(
+        Promise.resolve(makeEsriImagery()), {}
+      );
+    } else {
+      opts.imageryProvider = makeEsriImagery();
+    }
+
+    cesiumViewer = new Cesium.Viewer('globe-3d', opts);
+
+    // Falls baseLayer nicht gegriffen hat: Layer nachträglich sicherstellen.
+    const layers = cesiumViewer.scene.imageryLayers;
+    if (layers.length === 0) {
+      layers.addImageryProvider(makeEsriImagery());
+    }
+
+    cesiumViewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0b3d5c');
     cesiumViewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0a0a2e');
-    cesiumViewer.scene.fog.enabled = true;
     cesiumViewer.scene.globe.enableLighting = false;
+    cesiumViewer.scene.globe.showGroundAtmosphere = true;
+    cesiumViewer.scene.fog.enabled = false;
+    // Kein Nachladen unterdrücken -> Tiles erscheinen zuverlässig
+    cesiumViewer.scene.requestRenderMode = false;
 
     cesiumReady = true;
   } catch (e) {
-    console.warn('CesiumJS init with Ion failed, trying OSM fallback:', e);
+    console.error('CesiumJS init failed, trying OSM fallback:', e);
     try {
       cesiumViewer = new Cesium.Viewer('globe-3d', {
         animation: false, timeline: false, fullscreenButton: false,
@@ -699,12 +758,16 @@ function initCesium() {
         sceneModePicker: false, baseLayerPicker: false, infoBox: false,
         selectionIndicator: false,
         creditContainer: document.createElement('div'),
-        imageryProvider: new Cesium.OpenStreetMapImageryProvider({
-          url: 'https://a.tile.openstreetmap.org/',
-        }),
         terrainProvider: new Cesium.EllipsoidTerrainProvider(),
       });
-      cesiumViewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0a2e');
+      cesiumViewer.scene.imageryLayers.removeAll();
+      cesiumViewer.scene.imageryLayers.addImageryProvider(
+        new Cesium.UrlTemplateImageryProvider({
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          credit: 'OpenStreetMap', maximumLevel: 19,
+        })
+      );
+      cesiumViewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0b3d5c');
       cesiumReady = true;
     } catch (e2) {
       console.error('CesiumJS completely failed:', e2);
@@ -716,6 +779,16 @@ function initCesium() {
   // not only when the user switches to the 3D view — this is what lets
   // buoys/target work in 3D even if the user starts by placing them there.
   if (cesiumReady) setupCesiumClickHandler();
+}
+
+// Das Billboard rotiert im Bildschirmraum. Damit das Boot in jeder
+// Kameraausrichtung (Chase-Cam!) korrekt zeigt, muss die Rotation relativ
+// zum Kamera-Heading berechnet werden.
+let boatHeadingDeg = 0;
+function updateBoatBillboardRotation() {
+  if (!boatEntity3d || !boatEntity3d.billboard || !cesiumViewer) return;
+  const camHeadingDeg = Cesium.Math.toDegrees(cesiumViewer.camera.heading);
+  boatEntity3d.billboard.rotation = -Cesium.Math.toRadians(boatHeadingDeg - camHeadingDeg);
 }
 
 // ============================================================
@@ -773,6 +846,8 @@ function updateChaseCameraSmooth(pt, followDist) {
       followDist
     )
   );
+  // Boot-Ausrichtung an die neue Kamera anpassen
+  updateBoatBillboardRotation();
 }
 
 // Short flyTo used when the user manually scrubs the slider while in follow mode.
@@ -998,12 +1073,15 @@ function renderTrack3D() {
   boatEntity3d = cesiumViewer.entities.add({
     position: Cesium.Cartesian3.fromDegrees(pts[0].lon, pts[0].lat, 10),
     billboard: {
-      image: boatDataUri3D,
-      scale: 1.5,
-      rotation: -Cesium.Math.toRadians(pts[0].heading),
-      alignedAxis: Cesium.Cartesian3.UNIT_Z,
+      image: boatCanvas3D,
+      scale: 1.0,
+      // Bildschirm-Rotation relativ zur Kamera (siehe updateBoatBillboardRotation).
+      // KEIN alignedAxis — das würde das Boot an die ECEF-Z-Achse kleben.
+      rotation: 0,
+      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
       verticalOrigin: Cesium.VerticalOrigin.CENTER,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      sizeInMeters: false,
     },
     label: {
       text: `${pts[0].speedKn.toFixed(1)} kn`,
@@ -1284,8 +1362,9 @@ function updateDisplay(pos, opts) {
 
   // 3D boat billboard + label
   if (boatEntity3d && cesiumReady) {
-    boatEntity3d.position = Cesium.Cartesian3.fromDegrees(pt.lon, pt.lat, 10);
-    if (boatEntity3d.billboard) boatEntity3d.billboard.rotation = -Cesium.Math.toRadians(pt.heading);
+    boatEntity3d.position = Cesium.Cartesian3.fromDegrees(pt.lon, pt.lat, 8);
+    boatHeadingDeg = pt.heading;
+    updateBoatBillboardRotation();
     if (boatEntity3d.label) boatEntity3d.label.text = `${pt.speedKn.toFixed(1)} kn`;
   }
 
@@ -1536,23 +1615,109 @@ async function fetchWithFallback(url) {
   }
 }
 
-// Liest einen Hazu und extrahiert alle GPX-Datei-Links aus den Item-Beschreibungen
-async function listHazuTracks(hazuId) {
-  const endpoints = [
-    `${HAZU_BASE}/api/hazu/${hazuId}/children`,
-    `${HAZU_BASE}/api/v1/hazu/${hazuId}`,
-    `${HAZU_BASE}/${hazuId}`,
+// Hazu speichert Inhalte in Firebase (Projekt hazu-ch). GPX-Dateien landen in
+// Firebase Storage; der Link steht im `description`-HTML des Hazu bzw. Items.
+// Wir probieren die Firebase-REST-Endpoints durch — sie sind CORS-fähig.
+const HAZU_PROJECT = 'hazu-ch';
+
+function hazuCandidateEndpoints(id) {
+  const fs = `https://firestore.googleapis.com/v1/projects/${HAZU_PROJECT}/databases/(default)/documents`;
+  const rtdb = `https://${HAZU_PROJECT}.firebaseio.com`;
+  return [
+    // Firestore: Dokument + Unterelemente
+    `${fs}/hazus/${id}`,
+    `${fs}/hazu/${id}`,
+    `${fs}/items?pageSize=300&mask.fieldPaths=description&mask.fieldPaths=parentId`,
+    // Realtime DB
+    `${rtdb}/hazus/${id}.json`,
+    `${rtdb}/hazu/${id}.json`,
+    `${rtdb}/items.json?orderBy=%22parentId%22&equalTo=%22${id}%22`,
+    // Hazu eigene Routen (falls vorhanden)
+    `${HAZU_BASE}/api/hazu/${id}`,
+    `${HAZU_BASE}/api/hazu/${id}/children`,
+    `${HAZU_BASE}/${id}`,
   ];
-  let lastErr = null;
-  for (const url of endpoints) {
+}
+
+// Firebase-Storage-Ordner des Hazu-Users. Alle in Hazu hochgeladenen Dateien
+// liegen hier — damit lassen sich neue GPX automatisch finden.
+const HAZU_STORAGE_BUCKET = 'hazu-ch.appspot.com';
+const HAZU_STORAGE_PREFIX = 'files/hGkK2s8ofQXWdaeKuP0nlRm1IRu2/';
+
+async function listStorageTracks() {
+  const url = `https://firebasestorage.googleapis.com/v0/b/${HAZU_STORAGE_BUCKET}/o?prefix=`
+    + encodeURIComponent(HAZU_STORAGE_PREFIX) + '&maxResults=1000';
+  const text = await fetchWithFallback(url);
+  const data = JSON.parse(text);
+  if (!data.items) throw new Error('keine items in Storage-Antwort');
+  return data.items
+    .filter(o => /\.gpx$/i.test(o.name))
+    .map(o => {
+      const token = (o.downloadTokens || '').split(',')[0];
+      let dl = `https://firebasestorage.googleapis.com/v0/b/${HAZU_STORAGE_BUCKET}/o/`
+        + encodeURIComponent(o.name) + '?alt=media';
+      if (token) dl += '&token=' + token;
+      let name = o.name.substring(HAZU_STORAGE_PREFIX.length);
+      // Hazu hängt einen Timestamp an: "Track_1785513300466.gpx" -> "Track.gpx"
+      name = name.replace(/_\d{13}(\.gpx)$/i, '$1');
+      return { url: dl, name };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Bekannte Tracks als verlässlicher Fallback, falls keine API erreichbar ist.
+const HAZU_KNOWN_TRACKS = [
+  {
+    name: 'Stäfa–Rappi 2025-06-15',
+    url: 'https://firebasestorage.googleapis.com/v0/b/hazu-ch.appspot.com/o/'
+       + 'files%2FhGkK2s8ofQXWdaeKuP0nlRm1IRu2%2FSta%CC%88fa%20Rappi%20SailFreeGps_2025-06-15_01-42-45_1785513300466.gpx'
+       + '?alt=media&token=c5b296fb-00a9-4626-b461-3ae8bb9253ad',
+  },
+  {
+    name: 'Track 1 — Stäfa–Rappi 2025-06-15',
+    url: 'https://firebasestorage.googleapis.com/v0/b/hazu-ch.appspot.com/o/'
+       + 'files%2FhGkK2s8ofQXWdaeKuP0nlRm1IRu2%2FSta%CC%88fa%20Rappi%20SailFreeGps_2025-06-15_01-42-45_1785512757827.gpx'
+       + '?alt=media&token=7b9f1cbb-6b8b-4bc9-997c-61cb6128cfdf',
+  },
+];
+
+// Liest einen Hazu und extrahiert alle GPX-Datei-Links
+async function listHazuTracks(hazuId) {
+  const tried = [];
+
+  // 1. Storage-Ordner direkt auflisten — findet auch neu hochgeladene Dateien
+  try {
+    const st = await listStorageTracks();
+    if (st.length > 0) { console.info('Hazu tracks via Storage listing'); return st; }
+    tried.push('Storage-Listing → 0 GPX');
+  } catch (e) {
+    tried.push('Storage-Listing → ' + e.message);
+  }
+
+  for (const url of hazuCandidateEndpoints(hazuId)) {
     try {
       const text = await fetchWithFallback(url);
       const tracks = extractGpxLinks(text);
-      if (tracks.length > 0) return tracks;
-      lastErr = new Error('Keine GPX-Links gefunden');
-    } catch (e) { lastErr = e; }
+      if (tracks.length > 0) {
+        console.info('Hazu tracks via', url);
+        return tracks;
+      }
+      tried.push(url.split('?')[0] + ' → 0 Treffer');
+    } catch (e) {
+      tried.push(url.split('?')[0] + ' → ' + e.message);
+    }
   }
-  throw lastErr || new Error('Hazu nicht erreichbar');
+  console.warn('Hazu endpoints tried:\n' + tried.join('\n'));
+
+  // Letzter Fallback: eingebaute Liste
+  if (HAZU_KNOWN_TRACKS.length > 0) {
+    console.info('Falling back to built-in track list');
+    return HAZU_KNOWN_TRACKS.slice();
+  }
+
+  const err = new Error('kein Endpoint lieferte GPX-Links');
+  err.tried = tried;
+  throw err;
 }
 
 // Findet GPX-URLs in HTML oder JSON
