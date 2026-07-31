@@ -604,37 +604,49 @@ function lerpAngle(a, b, t) {
 // ============================================================
 // BOAT / BUOY / TARGET ICONS (SVG)
 // ============================================================
-// Schlichter Pfeil in Bootsform: spitzer Bug, konkaves Heck.
-// Zeigt nach oben (0° = Norden), wird per CSS/Cesium mit dem Heading rotiert.
+// Kleines Segelboot von oben: spitzer Bug oben, Rumpf verjüngt zum Heck,
+// darauf ein weißes Segel. Zeigt nach Norden (0°), rotiert mit dem Heading.
+// Ein gemeinsamer Pfad für 2D (SVG) und 3D (Canvas via Path2D).
+const BOAT_HULL_PATH = 'M16,2 C19.2,7 20.6,13 20.6,18.5 L19.8,25 Q16,27.4 12.2,25 L11.4,18.5 C11.4,13 12.8,7 16,2 Z';
+const BOAT_SAIL_PATH = 'M16,5.5 L16,22 L20.2,19.6 C19.6,13.4 18.2,9 16,5.5 Z';
+const BOAT_JIB_PATH  = 'M15.2,7.5 L15.2,20.5 L12,19 C12.4,14.2 13.5,10.4 15.2,7.5 Z';
+
 const boatSVGMarkup = `<svg viewBox="0 0 32 32" width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-  <path d="M16,2 L27,28 Q16,23 5,28 Z" fill="#e94560" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"/>
-  <line x1="16" y1="7" x2="16" y2="24" stroke="#ffffff" stroke-width="1.1" opacity="0.75"/>
+  <path d="${BOAT_HULL_PATH}" fill="#e94560" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="${BOAT_JIB_PATH}" fill="#ffffff" opacity="0.75"/>
+  <path d="${BOAT_SAIL_PATH}" fill="#ffffff" opacity="0.95"/>
+  <line x1="16" y1="4" x2="16" y2="23" stroke="#20304a" stroke-width="1" opacity="0.8"/>
 </svg>`;
 
 // Cesium kann SVG-Data-URIs unzuverlässig als WebGL-Textur laden.
-// Darum zeichnen wir das Boot auf ein Canvas — das funktioniert immer.
+// Darum zeichnen wir dasselbe Boot auf ein Canvas — das funktioniert immer.
 function makeBoatCanvas(size) {
   const s = size || 64;
   const c = document.createElement('canvas');
   c.width = s; c.height = s;
   const g = c.getContext('2d');
   const k = s / 32;
-  g.beginPath();
-  g.moveTo(16*k, 2*k);
-  g.lineTo(27*k, 28*k);
-  g.quadraticCurveTo(16*k, 23*k, 5*k, 28*k);
-  g.closePath();
-  g.fillStyle = '#e94560';
-  g.fill();
-  g.lineWidth = 2.2 * k;
-  g.strokeStyle = '#ffffff';
+  g.scale(k, k);
   g.lineJoin = 'round';
-  g.stroke();
+
+  const hull = new Path2D(BOAT_HULL_PATH);
+  g.fillStyle = '#e94560';
+  g.fill(hull);
+  g.lineWidth = 1.5;
+  g.strokeStyle = '#ffffff';
+  g.stroke(hull);
+
+  g.globalAlpha = 0.75;
+  g.fillStyle = '#ffffff';
+  g.fill(new Path2D(BOAT_JIB_PATH));
+  g.globalAlpha = 0.95;
+  g.fill(new Path2D(BOAT_SAIL_PATH));
+  g.globalAlpha = 1;
+
   g.beginPath();
-  g.moveTo(16*k, 7*k);
-  g.lineTo(16*k, 24*k);
-  g.lineWidth = 1.4 * k;
-  g.strokeStyle = 'rgba(255,255,255,0.8)';
+  g.moveTo(16, 4); g.lineTo(16, 23);
+  g.lineWidth = 1;
+  g.strokeStyle = 'rgba(32,48,74,0.8)';
   g.stroke();
   return c;
 }
@@ -1602,14 +1614,28 @@ function hazuStatus(msg, isError) {
   el.style.color = isError ? '#ff6b6b' : 'var(--text-dim)';
 }
 
-async function fetchWithFallback(url) {
+// Cache-Buster: Firebase Storage und der CORS-Proxy cachen aggressiv, dadurch
+// lieferte "Tracks laden" beim zweiten Mal immer die alte Liste.
+function bustCache(url) {
+  const sep = url.indexOf('?') === -1 ? '?' : '&';
+  return url + sep + '_cb=' + Date.now() + Math.random().toString(36).slice(2, 7);
+}
+
+const NO_CACHE = {
+  cache: 'no-store',
+  headers: { 'Cache-Control': 'no-cache, no-store, max-age=0', 'Pragma': 'no-cache' },
+};
+
+async function fetchWithFallback(url, opts) {
+  const fresh = (opts && opts.allowCache) ? url : bustCache(url);
+  const init = (opts && opts.allowCache) ? {} : NO_CACHE;
   try {
-    const r = await fetch(url);
+    const r = await fetch(fresh, init);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return await r.text();
   } catch (e) {
-    // CORS oder Netzwerkfehler → Proxy versuchen
-    const r2 = await fetch(CORS_PROXY + encodeURIComponent(url));
+    // CORS oder Netzwerkfehler → Proxy versuchen (ebenfalls cache-busted)
+    const r2 = await fetch(bustCache(CORS_PROXY + encodeURIComponent(fresh)), NO_CACHE);
     if (!r2.ok) throw new Error('HTTP ' + r2.status + ' (auch via Proxy)');
     return await r2.text();
   }
@@ -1774,16 +1800,23 @@ document.getElementById('btn-hazu-list').addEventListener('click', async functio
   if (!id) { hazuStatus('Bitte Hazu-ID eingeben', true); return; }
   hazuStatus('Suche GPX-Dateien in Hazu …');
   const sel = document.getElementById('hazu-tracks');
+  // Dropdown vollständig zurücksetzen, damit keine alte Auswahl hängen bleibt
+  sel.innerHTML = '';
+  sel.selectedIndex = -1;
+  this.disabled = true;
   try {
     const tracks = await listHazuTracks(id);
     sel.innerHTML = '<option value="">— Track wählen —</option>' +
       tracks.map(t => `<option value="${t.url.replace(/"/g,'&quot;')}">${t.name}</option>`).join('');
+    sel.selectedIndex = 0;
     sel.style.display = 'block';
     hazuStatus(tracks.length + ' Track(s) gefunden');
   } catch (e) {
     sel.style.display = 'none';
     hazuStatus('Keine Tracks gefunden — bitte GPX-URL direkt einfügen', true);
     console.warn('Hazu listing failed:', e);
+  } finally {
+    this.disabled = false;
   }
 });
 
@@ -1791,6 +1824,11 @@ document.getElementById('hazu-tracks').addEventListener('change', function() {
   if (this.value) {
     loadGpxFromUrl(this.value, this.options[this.selectedIndex].textContent);
   }
+});
+
+// Dieselbe Auswahl erneut anklicken soll neu laden (z.B. nach Re-Upload)
+document.getElementById('hazu-tracks').addEventListener('click', function() {
+  this.dataset.prev = this.value;
 });
 
 document.getElementById('btn-hazu-load').addEventListener('click', function() {
